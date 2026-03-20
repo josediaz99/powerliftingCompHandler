@@ -1,4 +1,12 @@
-/.venv
-scrapeLiftcastUrl.py
-__pycache__
-instance/
+/notebooks/data
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+staticfiles/
+.DS_Store
+venv/
+data
+*.db
+*.sqlite3

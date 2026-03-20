@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>IronCrawler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+  {% load static %}
+    <style>
+    /* ── Athlete Dashboard ── */
+    .athlete_dash {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+    }
+    
+    /* ── Athlete card (one per athlete) ── */
+    .athlete-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        overflow: hidden;
+        opacity: 0;
+        animation: slideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        transition: border-color 0.2s;
+    }
+    
+    .athlete-card:hover {
+        border-color: var(--glass-border-h);
+    }
+    
+    /* ── Athlete header row ── */
+    .athlete-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px 14px;
+        border-bottom: 1px solid var(--glass-border);
+        background: rgba(27, 36, 50, 0.5);
+    }
+    
+    .athlete-name {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: 0.01em;
+        line-height: 1.2;
+    }
+    
+    .athlete-meta {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 5px;
+    }
+    
+    .meta-tag {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.48rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        background: rgba(27, 36, 50, 0.8);
+        border: 1px solid var(--text-faint);
+        padding: 2px 7px;
+        border-radius: 3px;
+    }
+    
+    .meta-tag.highlight {
+        color: var(--accent);
+        border-color: rgba(200, 240, 255, 0.25);
+        background: rgba(200, 240, 255, 0.05);
+    }
+    
+    /* ── Lifts grid ── */
+    .lifts-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .lift-cell {
+        padding: 14px 16px;
+        border-right: 1px solid var(--glass-border);
+        text-align: center;
+    }
+    
+    .lift-cell:last-child {
+        border-right: none;
+    }
+    
+    .lift-label {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.46rem;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin-bottom: 6px;
+    }
+    
+    .lift-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--text);
+        letter-spacing: -0.02em;
+    }
+    
+    .lift-value.total {
+        color: var(--accent);
+    }
+    
+    .lift-unit {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.42rem;
+        letter-spacing: 0.15em;
+        color: var(--text-dim);
+        margin-top: 3px;
+    }
+    
+    /* ── Footer row: bodyweight, age, points ── */
+    .athlete-footer {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        padding: 12px 16px;
+        gap: 8px;
+    }
+    
+    .footer-stat {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .footer-stat-label {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.44rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+    }
+    
+    .footer-stat-value {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-dim);
+        letter-spacing: 0.01em;
+    }
+    
+    .footer-stat-value.points-val {
+        color: var(--accent);
+    }
+    
+    /* ── Flight / session badge in header right ── */
+    .session-badge {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.5rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        text-align: right;
+        color: var(--text-faint);
+        line-height: 1.7;
+    }
+    
+    .session-badge span {
+        display: block;
+    }
+    </style>
+    </head>
+
+    <body>
+          <header>
+            <h1 class="wordmark">Iron<em>Crawler</em></h1>
+            <div class="header-rule"></div>
+            <p class="tagline">Powerlifting · Competition Assistant</p>
+        </header>
+
+        <div class="list-header">
+            <!-- change with the name of the athlete once the database is in place -->
+          <h2 class="list-label">temp</h2>
+        </div>
+
+        <div class="athlete_dash">
+        {% if athletes %}
+            {% for athlete in athletes %}
+            <div class="athlete-header">
+                <div>
+                <div class="athlete-name">{{ athlete.athlete_name }}</div>
+                <div class="athlete-meta">
+                    <span class="meta-tag highlight">{{ athlete.get_gender_display }}</span>
+                    {% if athlete.weight_class %}<span class="meta-tag">{{ athlete.weight_class }}</span>{% endif %}
+                    {% if athlete.division %}<span class="meta-tag">{{ athlete.division }}</span>{% endif %}
+                    {% if athlete.category %}<span class="meta-tag">{{ athlete.category }}</span>{% endif %}
+                    {% if athlete.team %}<span class="meta-tag">{{ athlete.team }}</span>{% endif %}
+                </div>
+                </div>
+                <div class="session-badge">
+                {% if athlete.session %}<span>Session {{ athlete.session }}</span>{% endif %}
+                {% if athlete.flight %}<span>Flight {{ athlete.flight }}</span>{% endif %}
+                </div>
+            </div>
+        
+            <div class="lifts-grid">
+                <div class="lift-cell">
+                <div class="lift-label">Squat</div>
+                <div class="lift-value">{{ athlete.best_squat }}</div>
+                <div class="lift-unit">kg</div>
+                </div>
+                <div class="lift-cell">
+                <div class="lift-label">Bench</div>
+                <div class="lift-value">{{ athlete.best_bench }}</div>
+                <div class="lift-unit">kg</div>
+                </div>
+                <div class="lift-cell">
+                <div class="lift-label">Deadlift</div>
+                <div class="lift-value">{{ athlete.best_dead }}</div>
+                <div class="lift-unit">kg</div>
+                </div>
+                <div class="lift-cell">
+                <div class="lift-label">Total</div>
+                <div class="lift-value total">{{ athlete.total }}</div>
+                <div class="lift-unit">kg</div>
+                </div>
+            </div>
+        
+            <div class="athlete-footer">
+                <div class="footer-stat">
+                <span class="footer-stat-label">Bodyweight</span>
+                <span class="footer-stat-value">{% if athlete.bw %}{{ athlete.bw|floatformat:1 }} kg{% else %}—{% endif %}</span>
+                </div>
+                <div class="footer-stat">
+                <span class="footer-stat-label">Age</span>
+                <span class="footer-stat-value">{% if athlete.age %}{{ athlete.age }}{% else %}—{% endif %}</span>
+                </div>
+                <div class="footer-stat">
+                <span class="footer-stat-label">GL Points</span>
+                <span class="footer-stat-value points-val">{% if athlete.points %}{{ athlete.points|floatformat:2 }}{% else %}—{% endif %}</span>
+                </div>
+            </div>
+        
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty">
+            <span class="empty-glyph">⚠️</span>
+            <p>No athlete data found</p>
+            </div>
+        {% endif %}
+        </div>
+        
+        <!-- add section to refresh for testing -->
+
+    </body>
+</html>
