@@ -301,8 +301,8 @@
   <div class="comp-list">
     {% if competitions %}
       {% for comp in competitions %}
-      <!-- pass competition to get athletes from database using comp_id-->
-      <a class="comp-card" href="{{ url 'athlete_dash' comp.id }}">
+      {# ✅ FIX: was {{ url ... }} — URL tags must use {% %} not {{ }} #}
+      <a class="comp-card" href="{% url 'athlete_dash' comp.comp_id %}">
         <div class="card-date">
           <div class="date-num">{{ comp.comp_date|date:"d" }}</div>
           <div class="date-mon">{{ comp.comp_date|date:"M" }}</div>
@@ -318,7 +318,7 @@
       {% endfor %}
     {% else %}
       <div class="empty">
-        <span class="empty-glyph"></span>
+        <span class="empty-glyph">🏋️</span>
         <p>No competitions loaded yet</p>
       </div>
     {% endif %}

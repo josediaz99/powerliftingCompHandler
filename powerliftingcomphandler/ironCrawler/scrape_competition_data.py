@@ -1,4 +1,8 @@
-"""this file contains the functions to extract competition data from lifting cast
+"""
+ironCrawler/scrape_competition_data.py
+
+scrapes upcoming competition data from lifting cast main page
+Run via: python manage.py scrape_competition_data --url <meet url>
 """
 # standard libraries
 from datetime import datetime, timedelta
@@ -6,8 +10,6 @@ import os
 import random
 import re
 import sys
-from pathlib import Path
-sys.path.append(str(Path().resolve().parent))
 # web scraping + selenium specific libraires
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -51,7 +53,7 @@ def date_in_days(days:int):
     return (datetime.today() + timedelta(days=days)).date()
 
 def parse_competitions(competition_table_rows: list)-> list:
-    """function takes 
+    """function takes list of html table rows and extracts competition data as a lift of dicts
 
     Args:
         competition_table_rows (list): list of html rows containing competition data
@@ -59,7 +61,7 @@ def parse_competitions(competition_table_rows: list)-> list:
     Returns:
         list: list of dictionaries containing competition data
     """
-    url = "https://liftingcast.com"
+    base_url = "https://liftingcast.com"
 
     date_range = 7
     last_date = date_in_days(date_range)
@@ -75,34 +77,31 @@ def parse_competitions(competition_table_rows: list)-> list:
             raw_date = tds[1].contents[0]
             date = datetime.strptime(raw_date, "%m/%d/%Y").date()
 
-            # converting date to sqlite compatible version
-            formated_date = to_iso_date(raw_date)
-
             # check if data is within the 7 days
             if  date <= last_date:
-                comp = {'name':name,
-                        'link':url + link,
-                        'date':formated_date}
+                comp = {'name': name,
+                        'link': base_url + link,
+                        'date': to_iso_date(raw_date)}
                 compe_list.append(comp)
             else:
                 break
-        except :
+        except Exception:
             print("ERROR row data:", competition)
             break
     return compe_list
 
 def get_random_user() -> str:
-    """function avoid detection through returning randomized user agent
+    """returns a randomized user agent as a string for selenium driver
 
     Returns:
         str: a random user agent string
     """
     base = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-    user_agent = [
-    # Chrome 120+ Windows
-    "Chrome/121.0.0.0 Safari/537.36",
-    "Chrome/122.0.0.0 Safari/537.36",
-    "Chrome/123.0.0.0 Safari/537.36",]    
+    user_agent = [ # Chrome 120+ Windows
+        "Chrome/121.0.0.0 Safari/537.36",
+        "Chrome/122.0.0.0 Safari/537.36",
+        "Chrome/123.0.0.0 Safari/537.36",]
+    
     user = base + random.choice(user_agent)
     return user
 ###################################### MAIN SCRAPER FUNCTIONS ######################################
@@ -114,17 +113,12 @@ def create_webdriver() -> webdriver.Chrome:
     """
 
     user_agent = get_random_user()
+
     # create folder to store competition data
     download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
     os.makedirs(download_dir, exist_ok=True)
-    print("Current working directory:", os.getcwd())
-    print("Download directory:", download_dir)
-    print("Directory exists:", os.path.exists(download_dir))
 
-    # pulls driver to avoid downloading manualy
     options = Options()
-
-    # headless driver + reliability
     options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
@@ -132,8 +126,6 @@ def create_webdriver() -> webdriver.Chrome:
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
     options.add_argument(f"--user-agent={user_agent}")
-
-    # allowing for downloads early
     options.add_experimental_option("prefs", {
         "download.default_directory": download_dir,
         "download.prompt_for_download": False,
@@ -141,19 +133,12 @@ def create_webdriver() -> webdriver.Chrome:
         "safebrowsing.enabled": True,
     })
 
-    # creating chrome driver
     driver = webdriver.Chrome(options=options)
-
-    # remove webdriver flag
-    driver.execute_script(
-        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    )
-
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     # allow headless downloads
-    driver.execute_cdp_cmd("Page.setDownloadBehavior", {
-        "behavior": "allow",
-        "downloadPath": download_dir
-    })
+    driver.execute_cdp_cmd( "Page.setDownloadBehavior",
+                           {"behavior": "allow",
+                            "downloadPath": download_dir})
 
     return driver
 
@@ -166,21 +151,15 @@ def get_html(driver) -> list:
     Returns:
         str: html source code of the page
     """
-    wait_time = 60
-    wait = WebDriverWait(driver, wait_time)
-
-    # using the driver we automate and scrape the lifting cast competition page
+    wait = WebDriverWait(driver, 60)
     url = "https://liftingcast.com"
-    driver.get(url=url)
+    driver.get(url)
 
-    # wait for the table to exists with rows
     comp_row = "div.meets-table-table-wrapper table.table tbody tr"
     comp_links = "div.meets-table-table-wrapper table.table a[href]"
     wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, comp_row)))
-    # wait for the table to be populated
     wait.until(lambda d: len(d.find_elements(By.CSS_SELECTOR, comp_links)) >= 5)
 
-    # store out html, parse, and store as rows of competitions
     html = driver.page_source
     driver.quit()
     return html
@@ -195,13 +174,9 @@ def get_competition_data() -> list:
 
     html = get_html(create_webdriver())
     soup = BeautifulSoup(html, 'html.parser')
-    rows = soup.find_all('tr')
+    rows = soup.find_all('tr')[2:]# remove the first 2 rows (not competition data)
 
-    # remove the first 2 rows (not competition data)
-    rows = rows[2:]
-    competition_list = parse_competitions(rows)
-
-    return competition_list
+    return parse_competitions(rows)
 
 if __name__ == "__main__":
     comps = get_competition_data()

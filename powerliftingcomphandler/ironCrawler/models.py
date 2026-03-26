@@ -38,26 +38,3 @@ class Athlete(models.Model):
 
     def __str__(self):
         return self.athlete_name
-
-    def set_total(self):
-        """Recalculates and saves the athlete's total."""
-        self.total = self.best_squat + self.best_bench + self.best_dead
-
-    def calc_gl_points(self):
-        """
-        Calculates gl points based on bodyweight and total.
-        """
-
-        if not self.bw or not self.total:
-            return
-
-        if self.is_male:
-            a, b, c = 1199.72839, -102.11299, 0.0000022
-        else:
-            a, b, c = 1249.1533, -123.9606, 0.0000062
-
-        denominator = a + b * self.bw + c * self.bw ** 2
-        if denominator == 0:
-            return
-
-        self.gl_points = (self.total / denominator) * 100

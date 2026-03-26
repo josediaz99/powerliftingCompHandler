@@ -4,7 +4,7 @@
 
 ---
 
-### Overview
+## Overview
 
     The repository demonstrates the full workflow from**proof-of-concept experimentation in Jupyter** to **modular, reusable scraping functions** designed for scalable data collection.
 
@@ -12,7 +12,7 @@
 
 ---
 
-### **comp_scraping.ipynb & athlete_scraping.ipynb**
+### **comp_scraping.ipynb & athlete_scraping.ipynb (webscraping branch)**
 
 The notebooks demonstrates a proof of concept of scraping LiftingCast by:
 
@@ -36,7 +36,7 @@ The notebooks exists to:
 
 This step ensures the production scraper is built on verified browser automation behavior
 
-### **Production Scraper (currently working on)**
+### scrape_athlete_data, scrape_competition_data
 
 After validating the workflow in the notebook, the logic is being refactored into reusable functions that will:
 
@@ -64,6 +64,7 @@ The scraper implements filesystem monitoring to:
 * Wait for download completion
 * Prevent partial file reads
 * Ensure deterministic pipeline behavior
+* Remove files once ingested
 
 ### Technical Challenges Solved
 
@@ -71,30 +72,39 @@ The scraper implements filesystem monitoring to:
 
 LiftingCast uses a client-side React interface. The scraper uses **explicit Selenium waits** to ensure elements are interactable before actions are performed.
 
-##### Semi-Structured Athlete Data
+##### Semi-Structured competition data
 
-Athlete information appears in grouped blocks with weight-class headers. The project includes logic to correctly associate athletes with their respective categories.
+Competition data is stored in dynamically redered components which were parsed using beautiful soup to be stored to database
+
+##### Custom parsing logic for CSV irregularities
+
+athlete data is stored in CSVs which are can be formatted slightly different between each competition. Through monitoring of behavior of data througout competitions there are few bahaviors implemented to competitions which make pulling the data simpler
+
+- failed lifts will be negative (e.g -200)
+- all headers contain the same header names excluding (4rth attempts)
+  - 4rth attemps are not considered in competition to add to winning totals
+- refferee decisions can contain , inside their values making cleaning data from ", ', and extra spaces necessary
+- referee decisions can be usefull when considering creating a prediction model for future competition but not necessary when failed lifts are already stored as negative
 
 ---
 
-### Athlete Modeling and Missing-Field Reconstruction
-
-The LiftingCast export CSVs are not always fully complete or consistently structured across meets. To standardize downstream analysis, this project includes an `athlete.py` domain model athlete.py that represents an athlete as an object and computes derived fields when they are missing or need to be calculated.
-
-##### Purpose
-
-Some of the data which seems to be available on the csv is calculated post competition and need a way to be calculated before making decision. The athlete model also provides a consistent way to:
-
-* store athlete identity fields
-* track best squat/bench/deadlift
-* assign a weight class from bodyweight and sex using Powerlifting America-style class thresholds athlete
-* compute GL points from bodyweight, total, and sex using configured coefficients athlete
-
-## Tech Stack
+### Tech Stack
 
 * Python
+* Django
 * Selenium
 * Jupyter Notebook
 * pandas
 * Chrome WebDriver
 * BeautifulSoup4
+* sqlite3
+* html
+* css
+
+---
+
+### Future implementation
+
+-  data transformation and feature engineering for machine learning algorithms to predict if and how an athlete will fail a lift
+
+---
