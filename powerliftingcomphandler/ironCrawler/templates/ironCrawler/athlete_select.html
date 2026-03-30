@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <title>Select Athlete</title>
+        <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+        {% load static %}
+        <style>
+        :root {
+        --gunmetal:   #403f4c;
+        --shadow:     #2c2b3c;
+        --jet:        #1b2432;
+        --ink:        #121420;
+        --accent:     #c8f0ff;
+        --accent-dim: rgba(200, 240, 255, 0.12);
+        --text:       #dde6ed;
+        --text-dim:   #6b7a8a;
+        --text-faint: #3a4250;
+        --glass-bg:   rgba(44, 43, 60, 0.45);
+        --glass-border: rgba(200, 240, 255, 0.07);
+        --glass-border-h: rgba(200, 240, 255, 0.22);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+        background: var(--ink);
+        color: var(--text);
+        font-family: 'Syne', sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+        }
+
+        /* ── Layout ── */
+        .page {
+        position: relative;
+        z-index: 2;
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 0 24px 120px;
+        }
+
+        /* ── Header ── */
+        header {
+        padding: 64px 0 0;
+        margin-bottom: 56px;
+        }
+
+        .wordmark {
+        font-size: clamp(2.6rem, 10vw, 4rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1;
+        color: var(--text);
+        }
+
+        .wordmark em {
+        font-style: normal;
+        color: var(--accent);
+        }
+
+        .header-rule {
+        width: 40px;
+        height: 2px;
+        background: var(--gunmetal);
+        margin: 20px 0 16px;
+        }
+
+        .tagline {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.65rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        }
+
+        /* ── List header ── */
+        .list-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+        }
+
+        .list-label {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.58rem;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        }
+
+        .list-count {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.58rem;
+        letter-spacing: 0.1em;
+        color: var(--text-faint);
+        }
+
+        /* ── Divider ── */
+        .divider {
+        height: 1px;
+        background: linear-gradient(90deg, var(--shadow), transparent);
+        margin-bottom: 20px;
+        }
+
+        /* ── Competition cards ── */
+        .comp-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        }
+
+        .comp-card {
+        display: grid;
+        grid-template-columns: 56px 1fr auto;
+        align-items: center;
+        gap: 0;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        text-decoration: none;
+        color: inherit;
+        overflow: hidden;
+        cursor: pointer;
+        opacity: 0;
+        animation: slideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        transition: border-color 0.2s, background 0.2s;
+        }
+
+        .comp-card:nth-child(1)  { animation-delay: 0.03s; }
+        .comp-card:nth-child(2)  { animation-delay: 0.07s; }
+        .comp-card:nth-child(3)  { animation-delay: 0.11s; }
+        .comp-card:nth-child(4)  { animation-delay: 0.15s; }
+        .comp-card:nth-child(5)  { animation-delay: 0.19s; }
+        .comp-card:nth-child(6)  { animation-delay: 0.23s; }
+        .comp-card:nth-child(7)  { animation-delay: 0.27s; }
+        .comp-card:nth-child(8)  { animation-delay: 0.31s; }
+        .comp-card:nth-child(9)  { animation-delay: 0.35s; }
+        .comp-card:nth-child(n+10){ animation-delay: 0.38s; }
+
+        @keyframes slideIn {
+        from { opacity: 0; transform: translateX(-8px); }
+        to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .comp-card:hover {
+        border-color: var(--glass-border-h);
+        background: rgba(64, 63, 76, 0.5);
+        }
+
+        /* Date block */
+        .card-date {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 16px 0;
+        border-right: 1px solid var(--glass-border);
+        background: rgba(27, 36, 50, 0.4);
+        height: 100%;
+        transition: background 0.2s;
+        }
+
+        .comp-card:hover .card-date {
+        background: rgba(64, 63, 76, 0.3);
+        }
+
+        .date-num {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--accent);
+        letter-spacing: -0.02em;
+        }
+
+        .date-mon {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.5rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-top: 2px;
+        }
+
+        /* Card body */
+        .card-body {
+        padding: 14px 16px;
+        min-width: 0;
+        }
+
+        .card-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.4;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        }
+
+        .card-year {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.55rem;
+        color: var(--text-faint);
+        margin-top: 4px;
+        letter-spacing: 0.1em;
+        }
+
+        /* Countdown */
+        .card-right {
+        padding: 14px 16px 14px 8px;
+        display: flex;
+        align-items: center;
+        }
+
+        .pill {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.52rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        padding: 4px 9px;
+        border-radius: 4px;
+        background: rgba(27, 36, 50, 0.8);
+        border: 1px solid var(--text-faint);
+        color: var(--text-dim);
+        transition: border-color 0.2s, color 0.2s;
+        }
+
+        .pill.soon {
+        border-color: rgba(200, 240, 255, 0.3);
+        color: var(--accent);
+        background: rgba(200, 240, 255, 0.05);
+        }
+
+        .pill.today {
+        border-color: rgba(200, 240, 255, 0.5);
+        color: var(--accent);
+        background: rgba(200, 240, 255, 0.08);
+        animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.5; }
+        }
+
+        /* ── Filters ── */
+        .filters {
+        margin-bottom: 32px;
+        }
+
+        .filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        }
+
+        .filter-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        }
+
+        .filter-row label {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.6rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        }
+
+        .filter-row select {
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 4px;
+        color: var(--text);
+        font-family: 'Syne', sans-serif;
+        font-size: 0.8rem;
+        padding: 6px 10px;
+        min-width: 120px;
+        }
+
+        .filter-row select:focus {
+        border-color: var(--accent);
+        outline: none;
+        }
+
+        /* ── Athlete Cards ── */
+        .athlete-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        }
+
+        .athlete-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        padding: 16px;
+        transition: border-color 0.2s, background 0.2s;
+        }
+
+        .athlete-card:hover {
+        border-color: var(--glass-border-h);
+        background: rgba(64, 63, 76, 0.5);
+        }
+
+        .athlete-info {
+        flex: 1;
+        }
+
+        .athlete-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 4px;
+        }
+
+        .athlete-details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        }
+
+        .detail {
+        font-family: 'Syne Mono', monospace;
+        font-size: 0.65rem;
+        color: var(--text-dim);
+        background: rgba(27, 36, 50, 0.4);
+        padding: 2px 6px;
+        border-radius: 3px;
+        }
+
+        .athlete-actions {
+        margin-left: 16px;
+        }
+
+        .select-btn {
+        background: var(--accent);
+        color: var(--ink);
+        border: none;
+        border-radius: 4px;
+        padding: 8px 16px;
+        font-family: 'Syne', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+        }
+
+        .select-btn:hover {
+        background: rgba(200, 240, 255, 0.8);
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: var(--ink); }
+        ::-webkit-scrollbar-thumb { background: var(--gunmetal); border-radius: 2px; }
+    </style>
+    <script>
+        function selectAthlete(athleteId) {
+            // For now, just log the selection. You can modify this to redirect or handle selection
+            console.log('Selected athlete:', athleteId);
+            // Example: window.location.href = `/athlete/${athleteId}/`;
+        }
+    </script>
+    </head>
+
+    <body class="page">
+        <header>
+            <h1 class="wordmark">Select Athlete</h1>
+            <div class="header-rule"></div>
+            <p class="header-sub">{{ competition.comp_name }} - {{ competition.comp_date }}</p>
+        </header>
+
+        {% if not can_select %}
+            <div class="empty">
+                <p>{{ error_message }}</p>
+            </div>
+        {% else %}
+            <!-- Filters -->
+            <div class="filters">
+                <form method="get" class="filter-form">
+                    <div class="filter-row">
+                        <label for="sort">Sort by:</label>
+                        <select name="sort" id="sort" onchange="this.form.submit()">
+                            <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name A-Z</option>
+                            <option value="-name" {% if sort_by == '-name' %}selected{% endif %}>Name Z-A</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <label for="gender">Gender:</label>
+                        <select name="gender" id="gender" onchange="this.form.submit()">
+                            <option value="">All</option>
+                            {% for gender_option in filter_options.genders %}
+                                <option value="{{ gender_option }}" {% if filters.gender == gender_option %}selected{% endif %}>{{ gender_option|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <label for="category">Category:</label>
+                        <select name="category" id="category" onchange="this.form.submit()">
+                            <option value="">All</option>
+                            {% for cat in filter_options.categories %}
+                                <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <label for="division">Division:</label>
+                        <select name="division" id="division" onchange="this.form.submit()">
+                            <option value="">All</option>
+                            {% for div in filter_options.divisions %}
+                                <option value="{{ div }}" {% if filters.division == div %}selected{% endif %}>{{ div }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <label for="weight_class">Weight Class:</label>
+                        <select name="weight_class" id="weight_class" onchange="this.form.submit()">
+                            <option value="">All</option>
+                            {% for wc in filter_options.weight_classes %}
+                                <option value="{{ wc }}" {% if filters.weight_class == wc %}selected{% endif %}>{{ wc }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Athlete List -->
+            <div class="list-header">
+                <span class="list-label">ATHLETES</span>
+                <span class="list-count">{{ athletes|length }}</span>
+            </div>
+            <div class="divider"></div>
+
+            <div class="athlete-list">
+                {% if athletes %}
+                    {% for athlete in athletes %}
+                        <div class="athlete-card">
+                            <div class="athlete-info">
+                                <div class="athlete-name">{{ athlete.athlete_name }}</div>
+                                <div class="athlete-details">
+                                    <span class="detail">{{ athlete.gender|title }}</span>
+                                    <span class="detail">{{ athlete.category|title }}</span>
+                                    <span class="detail">{{ athlete.division }}</span>
+                                    <span class="detail">{{ athlete.weight_class }}</span>
+                                    {% if athlete.age %}
+                                        <span class="detail">{{ athlete.age }} yrs</span>
+                                    {% endif %}
+                                    {% if athlete.team %}
+                                        <span class="detail">{{ athlete.team }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="athlete-actions">
+                               <!-- call to athlete dash -->
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty">
+                        <p>No athletes match the selected filters</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+    </body>
+    </body>
+</html>
