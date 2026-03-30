@@ -6,14 +6,10 @@ Run via: python manage.py scrape_competition_data --url <meet url>
 """
 # standard libraries
 from datetime import datetime, timedelta
-import os
-import random
 import re
-import sys
 # web scraping + selenium specific libraires
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from .create_selenium_driver import create_webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -78,7 +74,7 @@ def parse_competitions(competition_table_rows: list)-> list:
             date = datetime.strptime(raw_date, "%m/%d/%Y").date()
 
             # check if data is within the 7 days
-            if  date <= last_date:
+            if date >= datetime.today().date() and date <= last_date:
                 comp = {'name': name,
                         'link': base_url + link,
                         'date': to_iso_date(raw_date)}
@@ -90,57 +86,7 @@ def parse_competitions(competition_table_rows: list)-> list:
             break
     return compe_list
 
-def get_random_user() -> str:
-    """returns a randomized user agent as a string for selenium driver
-
-    Returns:
-        str: a random user agent string
-    """
-    base = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-    user_agent = [ # Chrome 120+ Windows
-        "Chrome/121.0.0.0 Safari/537.36",
-        "Chrome/122.0.0.0 Safari/537.36",
-        "Chrome/123.0.0.0 Safari/537.36",]
-    
-    user = base + random.choice(user_agent)
-    return user
 ###################################### MAIN SCRAPER FUNCTIONS ######################################
-
-def create_webdriver() -> webdriver.Chrome:
-    """function creates a selenium driver for user to scrape dynamic content
-    Returns:
-       driver (webdriver.chrome): a selenium webdriver for scraping dynamic content
-    """
-
-    user_agent = get_random_user()
-
-    # create folder to store competition data
-    download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
-    os.makedirs(download_dir, exist_ok=True)
-
-    options = Options()
-    options.add_argument("--headless=new")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option("useAutomationExtension", False)
-    options.add_argument(f"--user-agent={user_agent}")
-    options.add_experimental_option("prefs", {
-        "download.default_directory": download_dir,
-        "download.prompt_for_download": False,
-        "download.directory_upgrade": True,
-        "safebrowsing.enabled": True,
-    })
-
-    driver = webdriver.Chrome(options=options)
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-    # allow headless downloads
-    driver.execute_cdp_cmd( "Page.setDownloadBehavior",
-                           {"behavior": "allow",
-                            "downloadPath": download_dir})
-
-    return driver
 
 def get_html(driver) -> list:
     """function uses chrome driver to get html source code of lifting cast main page

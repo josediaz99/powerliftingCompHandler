@@ -12,28 +12,30 @@ Behaviour:
 
 import logging
 from ironCrawler.scrape_competition_data import get_competition_data
+from ironCrawler.scrape_athlete_data import scrape_and_save_athletes
 from ironCrawler.models import Competition
 
 logger = logging.getLogger(__name__)
 
 
-def scrape_and_load() -> tuple[int, int]:
+def scrape_and_load() -> tuple[int, int, int]:
     """
     Scrapes liftingcast.com for upcoming competitions and syncs them with
-    the Competition table.
+    the Competition table. Then scrapes athletes for all competitions.
 
     - New competitions are created.
     - Competitions no longer returned by the scraper are deleted.
+    - Athletes are scraped and saved for all competitions.
 
     Returns:
-        (created_count, skipped_count)
+        (created_count, skipped_count, athletes_count)
     """
     logger.info("Starting competition scrape...")
     live_competitions = get_competition_data()
 
     if not live_competitions:
         logger.warning("Scraper returned no competitions — skipping DB sync to avoid wiping data.")
-        return 0, 0
+        return 0, 0, 0
 
     created  = 0
     skipped  = 0
@@ -55,6 +57,9 @@ def scrape_and_load() -> tuple[int, int]:
         if was_created:
             created += 1
             logger.info("Created: %s (%s)", name, date)
+            # Scrape athletes for new competition
+            athlete_count = scrape_and_save_athletes(obj)
+            logger.info("Scraped %d athletes for new competition: %s", athlete_count, name)
         else:
             skipped += 1
             logger.debug("Already exists: %s (%s)", name, date)
@@ -68,5 +73,17 @@ def scrape_and_load() -> tuple[int, int]:
             logger.info("Removing stale competition: %s (%s)", comp_obj.comp_name, comp_obj.comp_date)
             comp_obj.delete()
 
-    logger.info("Sync complete — created: %d, skipped: %d", created, skipped)
-    return created, skipped
+    logger.info("Competition sync complete — created: %d, skipped: %d", created, skipped)
+
+    # ── Scrape athletes for all competitions ──────────────────────────────
+    logger.info("Starting athlete scrape...")
+    athletes_total = 0
+    competitions = Competition.objects.all()
+    for competition in competitions:
+        logger.info("Scraping athletes for: %s", competition)
+        athlete_count = scrape_and_save_athletes(competition)
+        athletes_total += athlete_count
+        logger.info("Saved %d athletes for %s", athlete_count, competition)
+
+    logger.info("Full sync complete — competitions created: %d, skipped: %d, athletes: %d", created, skipped, athletes_total)
+    return created, skipped, athletes_total

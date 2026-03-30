@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 def scrape_job():
-    """Scheduled job: scrape competitions and load into the DB."""
+    """Scheduled job: scrape competitions and athletes, then load into the DB."""
     try:
-        created, skipped = scrape_and_load()
-        logger.info("Scheduled scrape complete — created: %d, skipped: %d", created, skipped)
+        created, skipped, athletes = scrape_and_load()
+        logger.info("Scheduled scrape complete — competitions created: %d, skipped: %d, athletes: %d", created, skipped, athletes)
     except Exception:
         logger.exception("Scheduled scrape failed")
 

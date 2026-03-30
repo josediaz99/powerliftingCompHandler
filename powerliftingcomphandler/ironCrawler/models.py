@@ -15,26 +15,26 @@ class Competition(models.Model):
 
 class Athlete(models.Model):
     GENDER_CHOICES = [
-        ('male',   'MALE'),
-        ('female', 'FEMALE'),
+        ('male',   'Male'),
+        ('female', 'Female'),
+        ('boy',    'Boy'),
+        ('girl',   'Girl'),
+        ('boys',   'Boys'),
+        ('girls',  'Girls'),
+    ]
+    EQUIPMENT_CHOICES = [
+        ('raw',       'Raw'),
+        ('equipped',  'Equipped'),
     ]
 
     competition  = models.ForeignKey(Competition, on_delete=models.CASCADE, related_name='athletes', null=True, blank=True)
-    athlete_name = models.CharField(max_length=255)
-    gender       = models.CharField(max_length=6, choices=GENDER_CHOICES)
-    category     = models.CharField(max_length=100, blank=True)
-    team         = models.CharField(max_length=100, blank=True)
-    session      = models.CharField(max_length=100, blank=True)
-    flight       = models.CharField(max_length=100, blank=True)
-    division     = models.CharField(max_length=100, blank=True)
-    bw           = models.FloatField(null=True, blank=True) 
-    weight_class = models.CharField(max_length=50, blank=True)
-    age          = models.IntegerField(null=True, blank=True)
-    best_squat   = models.IntegerField(default=0)
-    best_bench   = models.IntegerField(default=0)
-    best_dead    = models.IntegerField(default=0)
-    total        = models.IntegerField(default=0)
-    points       = models.FloatField(null=True, blank=True)
+    athlete_name = models.CharField(max_length=100)
+    gender       = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    category     = models.CharField(max_length=20, blank=True, choices=EQUIPMENT_CHOICES)
+    team         = models.CharField(max_length=50, blank=True)
+    division     = models.CharField(max_length=50, blank=True)  # award division
+    weight_class = models.CharField(max_length=10, blank=True)
+    age          = models.IntegerField(null=True, blank=True)   # exact age
 
     def __str__(self):
         return self.athlete_name
