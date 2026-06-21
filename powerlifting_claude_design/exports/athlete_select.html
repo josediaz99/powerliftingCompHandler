@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Athlete</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Syne:wght@400;500;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+  {% load static %}
+  <style>
+    :root {
+      --ink:#121420; --shadow:#2c2b3c; --accent:#c8f0ff;
+      --text:#dde6ed; --text-dim:#6b7a8a; --text-faint:#3a4250;
+      --glass-bg:rgba(44,43,60,0.45); --glass-border:rgba(200,240,255,0.07);
+      --glass-border-h:rgba(200,240,255,0.22); --chip-bg:rgba(27,36,50,0.45);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--ink);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+    .page{max-width:480px;margin:0 auto;padding:36px 18px 80px;}
+
+    /* top bar */
+    .topbar{display:flex;align-items:center;gap:11px;margin-bottom:20px;}
+    .back{display:flex;align-items:center;gap:5px;padding:7px 12px 7px 9px;border-radius:999px;
+      background:rgba(44,43,60,0.55);border:1px solid rgba(200,240,255,0.08);text-decoration:none;flex-shrink:0;}
+    .back .chev{color:var(--accent);font-size:0.95rem;line-height:1;}
+    .back span{font-family:'Syne Mono',monospace;font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:#8b97a8;}
+    .comp-context{font-size:0.78rem;font-weight:600;color:#aeb9c6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+
+    /* prompt */
+    .prompt-title{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:700;letter-spacing:-0.01em;color:var(--text);}
+    .prompt-sub{font-family:'Syne Mono',monospace;font-size:0.58rem;letter-spacing:0.1em;color:var(--text-dim);margin-top:6px;}
+
+    /* collapsible filter bar */
+    .filters{margin:18px 0 14px;background:rgba(44,43,60,0.4);border:1px solid var(--glass-border);border-radius:14px;overflow:hidden;}
+    .filter-toggle{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;}
+    .filter-toggle .left{display:flex;align-items:center;gap:9px;}
+    .filter-toggle .label{font-family:'Syne Mono',monospace;font-size:0.58rem;letter-spacing:0.16em;text-transform:uppercase;color:#aeb9c6;}
+    .filter-badge{display:none;font-family:'Syne Mono',monospace;font-size:0.5rem;font-weight:600;color:#121420;background:var(--accent);border-radius:999px;padding:1px 7px;}
+    .filter-badge.show{display:inline-block;}
+    .filter-toggle .right{display:flex;align-items:center;gap:10px;}
+    .result-count{font-family:'Syne Mono',monospace;font-size:0.55rem;color:var(--text-dim);letter-spacing:0.08em;}
+    .caret{display:inline-block;color:var(--text-dim);font-size:0.85rem;transition:transform 0.2s;}
+    .filters.open .caret{transform:rotate(180deg);}
+
+    .filter-body{display:none;padding:4px 14px 16px;border-top:1px solid rgba(200,240,255,0.06);}
+    .filters.open .filter-body{display:block;}
+    .filter-group-label{font-family:'Syne Mono',monospace;font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:#5b6878;margin:14px 0 8px;}
+    .chip-row{display:flex;flex-wrap:wrap;gap:7px;}
+    .chip{font-size:0.74rem;font-weight:500;letter-spacing:0.01em;white-space:nowrap;padding:7px 13px;border-radius:999px;cursor:pointer;
+      border:1px solid rgba(200,240,255,0.1);color:#8b97a8;background:var(--chip-bg);user-select:none;}
+    .chip.active{font-weight:600;border-color:rgba(200,240,255,0.5);color:var(--accent);background:rgba(200,240,255,0.1);}
+    .clear-filters{margin-top:16px;font-family:'Syne Mono',monospace;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase;
+      color:var(--text-dim);cursor:pointer;border-bottom:1px solid var(--text-faint);display:none;padding-bottom:2px;}
+    .clear-filters.show{display:inline-block;}
+
+    /* athlete banners (the whole card is the link/button) */
+    .athlete-list{display:flex;flex-direction:column;gap:8px;}
+    .athlete-card{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;
+      background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:14px;padding:14px;
+      text-decoration:none;color:inherit;cursor:pointer;transition:border-color 0.2s,background 0.2s;}
+    .athlete-card:hover{border-color:var(--glass-border-h);background:rgba(64,63,76,0.5);}
+    .athlete-card.hidden{display:none;}
+    .athlete-name{font-size:1rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .athlete-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;}
+    .athlete-tags span{font-family:'Syne Mono',monospace;font-size:0.55rem;color:#8b97a8;background:rgba(27,36,50,0.55);border-radius:5px;padding:2px 7px;}
+    .athlete-stat{text-align:right;}
+    .stat-total{font-size:1.05rem;font-weight:700;color:var(--accent);letter-spacing:-0.01em;line-height:1;}
+    .stat-sub{font-family:'Syne Mono',monospace;font-size:0.46rem;letter-spacing:0.14em;text-transform:uppercase;color:#5b6878;margin-top:4px;}
+    .chev-icon path{stroke:var(--text-dim);}
+    .empty{text-align:center;padding:48px 0;font-family:'Syne Mono',monospace;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-faint);}
+    .empty.show{display:block;}
+    .empty{display:none;}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- adjust 'index' to your meets-list URL name if different -->
+  <div class="topbar">
+    <a class="back" href="{% url 'index' %}">
+      <span class="chev">&lsaquo;</span><span>Meets</span>
+    </a>
+    <div class="comp-context">{{ competition.comp_name }}</div>
+  </div>
+
+  {% if not can_select %}
+    <div class="empty show">{{ error_message }}</div>
+  {% else %}
+    <div class="prompt-title">Select an athlete</div>
+    <div class="prompt-sub">Tap any lifter to open their dashboard</div>
+
+    <!-- Collapsible filters (chips are built by JS so only AVAILABLE options show) -->
+    <div class="filters" id="filters">
+      <div class="filter-toggle" id="filterToggle">
+        <div class="left">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 3h12M3 7h8M5 11h4" stroke="#c8f0ff" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <span class="label">Filters</span>
+          <span class="filter-badge" id="filterBadge">0</span>
+        </div>
+        <div class="right">
+          <span class="result-count" id="resultCount">0 shown</span>
+          <span class="caret">&#8964;</span>
+        </div>
+      </div>
+      <div class="filter-body">
+        <div class="filter-group-label">Gender</div>
+        <div class="chip-row" data-field="gender"></div>
+        <div class="filter-group-label">Weight class</div>
+        <div class="chip-row" data-field="weight"></div>
+        <div class="filter-group-label">Division</div>
+        <div class="chip-row" data-field="division"></div>
+        <div class="filter-group-label">Category</div>
+        <div class="chip-row" data-field="category"></div>
+        <div class="filter-group-label">Sort by</div>
+        <div class="chip-row" data-field="sort"></div>
+        <div class="clear-filters" id="clearFilters">Clear all filters</div>
+      </div>
+    </div>
+
+    <!-- Every athlete is rendered; JS shows/hides + sorts them -->
+    <div class="athlete-list" id="athleteList">
+      {% for athlete in athletes %}
+      <a class="athlete-card"
+         href="{% url 'athlete_dash' athlete.id %}"
+         data-name="{{ athlete.athlete_name }}"
+         data-gender="{{ athlete.gender }}"
+         data-category="{{ athlete.category }}"
+         data-division="{{ athlete.division }}"
+         data-weight="{{ athlete.weight_class }}"
+         data-total="{{ athlete.total }}"
+         data-dots="{{ athlete.dots_score|default:0 }}">
+        <div>
+          <div class="athlete-name">{{ athlete.athlete_name }}</div>
+          <div class="athlete-tags">
+            <span>{{ athlete.weight_class }}</span>
+            <span>{{ athlete.division }}</span>
+          </div>
+        </div>
+        <div class="athlete-stat">
+          <div class="stat-total">{{ athlete.total }}</div>
+          <div class="stat-sub">kg &middot; {{ athlete.dots_score|floatformat:1 }} dots</div>
+        </div>
+        <svg class="chev-icon" width="7" height="13" viewBox="0 0 7 13"><path d="M1 1l5 5.5L1 12" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      {% endfor %}
+    </div>
+    <div class="empty" id="noResults">No athletes match these filters</div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var listEl = document.getElementById('athleteList');
+  if (!listEl) return;
+
+  // read every rendered athlete card into a data array
+  var cards = Array.prototype.slice.call(listEl.querySelectorAll('.athlete-card'));
+  var data = cards.map(function (el) {
+    return {
+      el: el,
+      gender: el.dataset.gender || '',
+      weight: el.dataset.weight || '',
+      division: el.dataset.division || '',
+      category: el.dataset.category || '',
+      name: el.dataset.name || '',
+      total: parseFloat(el.dataset.total) || 0,
+      dots: parseFloat(el.dataset.dots) || 0
+    };
+  });
+
+  var FIELDS = ['gender', 'weight', 'division', 'category'];
+  var filters = { gender: '', weight: '', division: '', category: '' };
+  var sort = 'total';
+  var divOrder = ['Sub-Junior', 'Junior', 'Open', 'Masters 1', 'Masters 2'];
+
+  // distinct values for a field among athletes matching all OTHER active filters (cascading)
+  function optsExcept(field) {
+    var pool = data.filter(function (a) {
+      return FIELDS.every(function (k) { return k === field || !filters[k] || a[k] === filters[k]; });
+    });
+    var vals = [];
+    pool.forEach(function (a) { if (a[field] && vals.indexOf(a[field]) === -1) vals.push(a[field]); });
+    if (field === 'weight') vals.sort(function (x, y) { return parseFloat(x) - parseFloat(y); });
+    else if (field === 'division') vals.sort(function (x, y) { return divOrder.indexOf(x) - divOrder.indexOf(y); });
+    else vals.sort();
+    return vals;
+  }
+
+  function setField(field, value) {
+    filters[field] = value;
+    // prune any now-unavailable selections in other fields
+    FIELDS.forEach(function (o) {
+      if (o !== field && filters[o] && optsExcept(o).indexOf(filters[o]) === -1) filters[o] = '';
+    });
+    render();
+  }
+
+  function chip(label, active, onClick) {
+    var s = document.createElement('span');
+    s.className = 'chip' + (active ? ' active' : '');
+    s.textContent = label;
+    s.addEventListener('click', onClick);
+    return s;
+  }
+
+  function buildChips(field) {
+    var row = document.querySelector('.chip-row[data-field="' + field + '"]');
+    row.innerHTML = '';
+    row.appendChild(chip('All', !filters[field], function () { setField(field, ''); }));
+    optsExcept(field).forEach(function (v) {
+      row.appendChild(chip(v, filters[field] === v, function () { setField(field, v); }));
+    });
+  }
+
+  function buildSortChips() {
+    var row = document.querySelector('.chip-row[data-field="sort"]');
+    row.innerHTML = '';
+    [['Total', 'total'], ['DOTS', 'dots'], ['A\u2013Z', 'name'], ['Z\u2013A', '-name']].forEach(function (o) {
+      row.appendChild(chip(o[0], sort === o[1], function () { sort = o[1]; render(); }));
+    });
+  }
+
+  function render() {
+    // chips reflect current cascading state
+    buildChips('gender'); buildChips('weight'); buildChips('division'); buildChips('category'); buildSortChips();
+
+    // filter
+    var visible = data.filter(function (a) {
+      return FIELDS.every(function (k) { return !filters[k] || a[k] === filters[k]; });
+    });
+    // sort
+    visible.sort(function (x, y) {
+      if (sort === 'total') return y.total - x.total;
+      if (sort === 'dots') return y.dots - x.dots;
+      if (sort === 'name') return x.name.localeCompare(y.name);
+      if (sort === '-name') return y.name.localeCompare(x.name);
+      return 0;
+    });
+
+    // hide all, then show + reorder visible
+    data.forEach(function (a) { a.el.classList.add('hidden'); });
+    visible.forEach(function (a) { a.el.classList.remove('hidden'); listEl.appendChild(a.el); });
+
+    // chrome
+    var active = FIELDS.filter(function (k) { return filters[k]; }).length;
+    var badge = document.getElementById('filterBadge');
+    badge.textContent = active; badge.classList.toggle('show', active > 0);
+    document.getElementById('clearFilters').classList.toggle('show', active > 0);
+    document.getElementById('resultCount').textContent = visible.length + ' shown';
+    document.getElementById('noResults').classList.toggle('show', visible.length === 0);
+  }
+
+  document.getElementById('filterToggle').addEventListener('click', function () {
+    document.getElementById('filters').classList.toggle('open');
+  });
+  document.getElementById('clearFilters').addEventListener('click', function () {
+    filters = { gender: '', weight: '', division: '', category: '' }; render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

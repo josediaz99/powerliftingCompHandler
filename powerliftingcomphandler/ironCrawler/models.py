@@ -36,5 +36,12 @@ class Athlete(models.Model):
     weight_class = models.CharField(max_length=10, blank=True)
     age          = models.IntegerField(null=True, blank=True)   # exact age
 
+    body_weight  = models.FloatField(null=True, blank=True)     # kg
+    best_squat   = models.FloatField(default=0)                 # kg
+    best_bench   = models.FloatField(default=0)                 # kg
+    best_deadlift = models.FloatField(default=0)                # kg
+    total        = models.FloatField(default=0)                 # kg
+    dots_score   = models.FloatField(null=True, blank=True)
+
     def __str__(self):
         return self.athlete_name

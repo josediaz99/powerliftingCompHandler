@@ -1,7 +1,39 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.utils import timezone
-from django.db.models import Q
+from django.shortcuts import render, get_object_or_404
 from .models import Competition, Athlete
+
+
+# ── DOTS coefficients ──────────────────────────────────────────────────────
+# Standard DOTS formula: dots = total * 500 / (A + B*bw + C*bw^2 + D*bw^3 + E*bw^4)
+DOTS_COEFFS = {
+    'male':   (-307.75076, 24.0900756, -0.1918759221, 0.0007391293, -0.000001093),
+    'female': (-57.96288,  13.6175032, -0.1126655,     0.0005158568, -0.0000010706),
+}
+
+
+def _dots_gender(gender: str) -> str:
+    """Maps the model's gender choices to the DOTS formula's male/female coefficients."""
+    return 'female' if gender in ('female', 'girl', 'girls') else 'male'
+
+
+def _dots_denominator(body_weight: float, gender: str) -> float:
+    a, b, c, d, e = DOTS_COEFFS[_dots_gender(gender)]
+    bw = body_weight
+    return a + b * bw + c * bw ** 2 + d * bw ** 3 + e * bw ** 4
+
+
+def total_needed_for_dots(target_dots: float, body_weight: float, gender: str) -> float:
+    """Returns the total (kg) required to reach a given DOTS score at a given bodyweight."""
+    return target_dots * _dots_denominator(body_weight, gender) / 500
+
+
+def athlete_dash(request, athlete_id):
+    """Athlete dashboard — passes full competitor pool; ranking is done client-side."""
+    athlete = get_object_or_404(Athlete, pk=athlete_id)
+    competitors = Athlete.objects.filter(competition=athlete.competition)
+    return render(request, 'ironCrawler/athlete_dash.html', {
+        'athlete': athlete,
+        'competitors': competitors,
+    })
 
 
 def index(request):
@@ -14,58 +46,12 @@ def index(request):
 
 
 def athlete_select(request, comp_id):
-    """Athlete selection for a single competition."""
+    """Athlete selection — passes full roster; filtering and sorting are done client-side."""
     competition = get_object_or_404(Competition, comp_id=comp_id)
-    
-    # Get filter parameters
-    sort_by = request.GET.get('sort', 'name')  # 'name' or '-name'
-    gender_filter = request.GET.get('gender', '')
-    category_filter = request.GET.get('category', '')
-    division_filter = request.GET.get('division', '')
-    weight_class_filter = request.GET.get('weight_class', '')
-    
-    # Start with all athletes for this competition
-    athletes = competition.athletes.all()
-    
-    # Apply filters
-    if gender_filter:
-        athletes = athletes.filter(gender__iexact=gender_filter)
-    if category_filter:
-        athletes = athletes.filter(category__iexact=category_filter)
-    if division_filter:
-        athletes = athletes.filter(division__iexact=division_filter)
-    if weight_class_filter:
-        athletes = athletes.filter(weight_class__iexact=weight_class_filter)
-    
-    # Apply sorting
-    if sort_by == 'name':
-        athletes = athletes.order_by('athlete_name')
-    elif sort_by == '-name':
-        athletes = athletes.order_by('-athlete_name')
-    
-    # Get distinct values for filter dropdowns
-    all_athletes = competition.athletes.all()
-    genders = sorted(set(a.gender for a in all_athletes if a.gender))
-    categories = sorted(set(a.category for a in all_athletes if a.category))
-    divisions = sorted(set(a.division for a in all_athletes if a.division))
-    weight_classes = sorted(set(a.weight_class for a in all_athletes if a.weight_class))
- 
+    athletes = competition.athletes.order_by('athlete_name')
     return render(request, 'ironCrawler/athlete_select.html', {
         'competition': competition,
         'athletes': athletes,
         'can_select': True,
-        'sort_by': sort_by,
-        'filters': {
-            'gender': gender_filter,
-            'category': category_filter,
-            'division': division_filter,
-            'weight_class': weight_class_filter,
-        },
-        'filter_options': {
-            'genders': genders,
-            'categories': categories,
-            'divisions': divisions,
-            'weight_classes': weight_classes,
-        },
     })
  

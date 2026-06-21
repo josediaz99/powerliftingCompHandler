@@ -1,0 +1,817 @@
+/* ══════════════════════════════════════════════════════
+   IronCrawler — shared stylesheet
+   ══════════════════════════════════════════════════════
+
+   ┌─────────────────────────────────────────────────┐
+   │  PALETTE — edit only this block to retheme.     │
+   │  Change --accent + --accent-rgb together.       │
+   │  Adjust --glass-bg / --chip-bg when changing   │
+   │  the surface colors.                            │
+   └─────────────────────────────────────────────────┘ */
+:root {
+  /* Accent — keep hex and rgb channels in sync */
+  --accent:         #c8f0ff;
+  --accent-rgb:     200, 240, 255;
+
+  /* Surfaces — darkest → lightest */
+  --ink:            #121420;                    /* page background       */
+  --surface:        #2c2b3c;                    /* dividers, rules       */
+  --glass-bg:       rgba(44, 43, 60, 0.45);     /* card fill             */
+  --chip-bg:        rgba(27, 36, 50, 0.65);     /* chips, controls       */
+
+  /* Text — primary → faint */
+  --text:           #dde6ed;
+  --text-dim:       #6b7a8a;
+  --text-faint:     #3a4250;
+  --text-mid:       #8b97a8;                    /* mid-tone labels       */
+  --text-muted:     #aeb9c6;                    /* light secondary       */
+  --text-deep:      #5b6878;                    /* very dim mono labels  */
+
+  /* Semantic indicators */
+  --good:           #9ef0b4;                    /* positive / leading    */
+  --bad:            #f0a6a6;                    /* negative / trailing   */
+
+  /* Derived — auto-computed from --accent-rgb (no edits needed) */
+  --glass-border:   rgba(var(--accent-rgb), 0.07);
+  --glass-border-h: rgba(var(--accent-rgb), 0.22);
+  --accent-dim:     rgba(var(--accent-rgb), 0.10);
+  --chip-border:    rgba(var(--accent-rgb), 0.06);
+}
+
+
+/* ── Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+
+/* ── Base ──────────────────────────────────────────── */
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+/* ── Layout ─────────────────────────────────────────── */
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 36px 18px 80px;
+}
+
+
+/* ══════════════════════════════════════════════════════
+   TOPBAR  (athlete_select / athlete_dash)
+   ══════════════════════════════════════════════════════ */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 20px;
+}
+
+.back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px 7px 9px;
+  border-radius: 999px;
+  background: rgba(44, 43, 60, 0.55);
+  border: 1px solid rgba(var(--accent-rgb), 0.08);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.back .chev {
+  color: var(--accent);
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.back span {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+
+.comp-context {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+
+/* ══════════════════════════════════════════════════════
+   WORDMARK HEADER  (index only)
+   ══════════════════════════════════════════════════════ */
+header { margin-bottom: 22px; }
+
+.wordmark {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1;
+  color: var(--text);
+}
+.wordmark span { color: var(--accent); }
+
+.tagline {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
+
+/* ══════════════════════════════════════════════════════
+   PAGE PROMPT  (athlete_select heading)
+   ══════════════════════════════════════════════════════ */
+.prompt-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.prompt-sub {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+
+/* ── Divider ────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, var(--surface), transparent);
+  margin: 18px 0 16px;
+}
+
+
+/* ── Section label row ──────────────────────────────── */
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.list-label {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.list-count {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+}
+
+
+/* ══════════════════════════════════════════════════════
+   COMPETITION CARDS  (index)
+   ══════════════════════════════════════════════════════ */
+.comp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.comp-card {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  height: 82px;
+  padding: 0 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.comp-card:hover {
+  border-color: var(--glass-border-h);
+  background: rgba(64, 63, 76, 0.5);
+}
+
+/* Date chip */
+.card-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 13px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  flex-shrink: 0;
+}
+.date-num {
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.date-mon {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: 3px;
+}
+
+/* Competition name */
+.card-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  text-wrap: pretty;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Countdown pill */
+.pill {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--text-faint);
+  color: var(--text-dim);
+  background: rgba(27, 36, 50, 0.6);
+}
+
+/* TODAY highlight */
+.comp-card.is-today .date-num { color: var(--accent); }
+.comp-card.is-today .pill {
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+
+/* ══════════════════════════════════════════════════════
+   COLLAPSIBLE FILTER PANEL  (athlete_select)
+   ══════════════════════════════════════════════════════ */
+.filters {
+  margin: 18px 0 14px;
+  background: rgba(44, 43, 60, 0.4);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.filter-toggle .left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.filter-toggle .label {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.filter-badge {
+  display: none;
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.5rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.filter-badge.show { display: inline-block; }
+
+.filter-toggle .right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.result-count {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+}
+.caret {
+  display: inline-block;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  transition: transform 0.2s;
+}
+.filters.open .caret { transform: rotate(180deg); }
+
+.filter-body {
+  display: none;
+  padding: 4px 14px 16px;
+  border-top: 1px solid rgba(var(--accent-rgb), 0.06);
+}
+.filters.open .filter-body { display: block; }
+
+.filter-group-label {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-deep);
+  margin: 14px 0 8px;
+}
+
+/* Filter chips */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.chip {
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid rgba(var(--accent-rgb), 0.1);
+  color: var(--text-mid);
+  background: var(--chip-bg);
+  user-select: none;
+}
+.chip.active {
+  font-weight: 600;
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.clear-filters {
+  display: none;
+  margin-top: 16px;
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 1px solid var(--text-faint);
+  padding-bottom: 2px;
+}
+.clear-filters.show { display: inline-block; }
+
+
+/* ══════════════════════════════════════════════════════
+   ATHLETE CARDS  (athlete_select)
+   ══════════════════════════════════════════════════════ */
+.athlete-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.athlete-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 14px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.athlete-card:hover {
+  border-color: var(--glass-border-h);
+  background: rgba(64, 63, 76, 0.5);
+}
+.athlete-card.hidden { display: none; }
+
+.athlete-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.athlete-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+.athlete-tags span {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.55rem;
+  color: var(--text-mid);
+  background: rgba(27, 36, 50, 0.55);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+
+.athlete-stat { text-align: right; }
+.stat-total {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.stat-sub {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.46rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-deep);
+  margin-top: 4px;
+}
+
+.chev-icon path { stroke: var(--text-dim); }
+
+
+/* ══════════════════════════════════════════════════════
+   ATHLETE DASHBOARD
+   ══════════════════════════════════════════════════════ */
+
+/* Name */
+.ath-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+/* Tags */
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.tag {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+  background: rgba(27, 36, 50, 0.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 3px 9px;
+}
+
+/* Refresh */
+.refresh-wrap { margin: 18px 0 8px; }
+
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+.refresh-btn:disabled {
+  border-color: rgba(var(--accent-rgb), 0.08);
+  color: var(--text-dim);
+  background: rgba(27, 36, 50, 0.5);
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(var(--accent-rgb), 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  display: none;
+  animation: spin 0.7s linear infinite;
+}
+.refresh-btn.loading .spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.refresh-meta {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-deep);
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Summary metric cards */
+.summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 14px 0 8px;
+}
+.sum-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 15px;
+}
+.sum-label {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-deep);
+}
+.sum-value {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 7px;
+}
+.sum-rank {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.52rem;
+  color: var(--text-mid);
+  margin-top: 8px;
+}
+.sum-gap {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.52rem;
+  margin-top: 3px;
+}
+.sum-gap.lead  { color: var(--good); }
+.sum-gap.behind { color: var(--bad); }
+
+/* Segmented controls */
+.controls { margin-top: 18px; }
+
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+.ctrl-row:last-of-type { margin-bottom: 0; }
+
+.ctrl-label {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-deep);
+}
+
+.seg { display: flex; gap: 6px; }
+.seg button {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid rgba(var(--accent-rgb), 0.08);
+  color: var(--text-mid);
+  background: var(--chip-bg);
+}
+.seg button.active {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+/* Leaderboard header */
+.lb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 22px 0 12px;
+}
+.lb-title {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.lb-count {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+  color: var(--text-deep);
+}
+
+/* Leaderboard list */
+.lb-list { display: flex; flex-direction: column; gap: 6px; }
+
+.lb-item {
+  background: rgba(44, 43, 60, 0.4);
+  border: 1px solid rgba(var(--accent-rgb), 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.lb-item.self {
+  background: rgba(var(--accent-rgb), 0.07);
+  border-color: rgba(var(--accent-rgb), 0.3);
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.lb-row.no-exp { cursor: default; }
+
+.lb-rank {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  width: 26px;
+  flex-shrink: 0;
+}
+.lb-main { flex: 1; min-width: 0; }
+.lb-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-sub {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  color: var(--text-deep);
+  margin-top: 3px;
+}
+.lb-value {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.74rem;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.lb-gap {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.62rem;
+  white-space: nowrap;
+  min-width: 52px;
+  text-align: right;
+}
+.lb-gap.ahead  { color: var(--good); }
+.lb-gap.behind { color: var(--bad); }
+.lb-gap.even   { color: var(--text-dim); }
+.lb-gap.you {
+  font-size: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  background: var(--accent);
+  border-radius: 5px;
+  padding: 3px 7px;
+}
+
+.lb-caret {
+  display: inline-block;
+  color: var(--text-deep);
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+.lb-item.open .lb-caret { transform: rotate(180deg); }
+
+/* Expandable lift detail */
+.lb-detail { display: none; padding: 4px 14px 14px; }
+.lb-item.open .lb-detail { display: block; }
+
+.det-head, .det-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 56px 60px;
+  gap: 8px;
+  align-items: center;
+}
+.det-head {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-deep);
+  padding: 0 2px 8px;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.06);
+}
+.det-head span:not(:first-child),
+.det-row  span:not(:first-child) { text-align: right; }
+
+.det-row {
+  padding: 7px 2px;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.04);
+}
+.det-lift {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mid);
+}
+.det-them {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.det-you {
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text);
+}
+.det-delta { font-family: 'Syne Mono', monospace; font-size: 0.7rem; }
+.det-delta.ahead  { color: var(--good); }
+.det-delta.behind { color: var(--bad); }
+.det-delta.even   { color: var(--text-dim); }
+
+
+/* ══════════════════════════════════════════════════════
+   SHARED UTILITIES
+   ══════════════════════════════════════════════════════ */
+
+/* Button */
+.btn {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--ink);
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+
+/* Empty state — hidden by default; add .show to display */
+.empty {
+  display: none;
+  text-align: center;
+  padding: 48px 0;
+  font-family: 'Syne Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.empty.show { display: block; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--ink); }
+::-webkit-scrollbar-thumb { background: var(--surface); border-radius: 2px; }

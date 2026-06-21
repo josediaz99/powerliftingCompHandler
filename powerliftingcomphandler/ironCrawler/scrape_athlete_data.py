@@ -83,6 +83,26 @@ def remove_csv(csv_path: str):
     """
     Path(csv_path).unlink(missing_ok=True)
 
+def _to_float(value: str) -> float:
+    """Converts a CSV numeric field to a float, treating blanks/dashes as 0."""
+    value = (value or '').strip()
+    if not value or value == '-':
+        return 0.0
+    try:
+        return float(value)
+    except ValueError:
+        return 0.0
+
+
+def _to_best_lift(value: str) -> float:
+    """Converts a 'Best Squat/Bench/Deadlift' CSV field to a float.
+
+    A negative value means every attempt for that lift was failed, so it
+    counts as no successful lift (0kg).
+    """
+    return max(0.0, _to_float(value))
+
+
 def save_athletes_to_db(competition: Competition, athletes_data: list):
     """Saves a list of athlete dictionaries to the database, linked to the given competition.
 
@@ -100,15 +120,21 @@ def save_athletes_to_db(competition: Competition, athletes_data: list):
             'team': athlete_dict.get('team', '').strip(),
             'division': athlete_dict.get('awards division', '').strip(),
             'weight_class': athlete_dict.get('weight class', '').strip(),
+            'body_weight': _to_float(athlete_dict.get('body weight (kg)', '')) or None,
+            'best_squat': _to_best_lift(athlete_dict.get('best squat', '')),
+            'best_bench': _to_best_lift(athlete_dict.get('best bench', '')),
+            'best_deadlift': _to_best_lift(athlete_dict.get('best deadlift', '')),
+            'total': _to_float(athlete_dict.get('total', '')),
+            'dots_score': _to_float(athlete_dict.get('dots points', '')) or None,
         }
-        
+
         # Handle age - convert to int if possible
         age_str = athlete_dict.get('age', '').strip()
         if age_str and age_str.isdigit():
             athlete_data['age'] = int(age_str)
-        
+
         # Create or update athlete (assuming unique by name and competition)
-        Athlete.objects.get_or_create(
+        Athlete.objects.update_or_create(
             competition=competition,
             athlete_name=athlete_data['athlete_name'],
             defaults=athlete_data

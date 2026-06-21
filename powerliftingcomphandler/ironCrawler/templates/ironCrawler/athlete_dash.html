@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ athlete.athlete_name }} — IronCrawler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Syne:wght@400;500;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'ironCrawler/style.css' %}">
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <a class="back" href="{% url 'athlete_select' athlete.competition.comp_id %}">
+      <span class="chev">&lsaquo;</span><span>Athletes</span>
+    </a>
+  </div>
+
+  <div class="ath-name">{{ athlete.athlete_name }}</div>
+  <div class="tag-row">
+    <span class="tag">{{ athlete.gender }}</span>
+    {% if athlete.category %}<span class="tag">{{ athlete.category }}</span>{% endif %}
+    {% if athlete.weight_class %}<span class="tag">{{ athlete.weight_class }} class</span>{% endif %}
+    {% if athlete.division %}<span class="tag">{{ athlete.division }}</span>{% endif %}
+    {% if athlete.body_weight %}<span class="tag">BW {{ athlete.body_weight }} kg</span>{% endif %}
+  </div>
+
+  <!-- Refresh latest data -->
+  <div class="refresh-wrap">
+    <button class="refresh-btn" id="refreshBtn">
+      <span class="spinner"></span>
+      <span id="refreshLabel">Pull latest data</span>
+    </button>
+    <div class="refresh-meta" id="refreshMeta">Tap to fetch the latest results</div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="summary">
+    <div class="sum-card">
+      <div class="sum-label">Total</div>
+      <div class="sum-value">{{ athlete.total }} kg</div>
+      <div class="sum-rank" id="totalRank">&mdash;</div>
+      <div class="sum-gap"  id="totalGap">&mdash;</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">DOTS</div>
+      <div class="sum-value">{{ athlete.dots_score|floatformat:1|default:"N/A" }}</div>
+      <div class="sum-rank" id="dotsRank">&mdash;</div>
+      <div class="sum-gap"  id="dotsGap">&mdash;</div>
+    </div>
+  </div>
+
+  <!-- Rank by / Compare controls -->
+  <div class="controls">
+    <div class="ctrl-row">
+      <span class="ctrl-label">Rank by</span>
+      <div class="seg" id="metricSeg">
+        <button data-v="dots"  class="active">DOTS</button>
+        <button data-v="total">Total</button>
+      </div>
+    </div>
+    <div class="ctrl-row">
+      <span class="ctrl-label">Compare</span>
+      <div class="seg" id="scopeSeg">
+        <button data-v="all"      class="active">All</button>
+        <button data-v="weight">Class</button>
+        <button data-v="category">Category</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lb-header">
+    <span class="lb-title" id="lbTitle">DOTS Leaderboard</span>
+    <span class="lb-count" id="lbCount">&mdash;</span>
+  </div>
+  <div class="lb-list" id="leaderboard"></div>
+
+  <!-- Hidden competitor pool — JS reads data-* attrs to build the leaderboard -->
+  <div id="poolData" hidden>
+    {% for c in competitors %}
+    <i data-id="{{ c.id }}"
+       data-self="{% if c.id == athlete.id %}1{% else %}0{% endif %}"
+       data-name="{{ c.athlete_name }}"
+       data-gender="{{ c.gender }}"
+       data-weight="{{ c.weight_class }}"
+       data-division="{{ c.division }}"
+       data-category="{{ c.category }}"
+       data-total="{{ c.total }}"
+       data-dots="{{ c.dots_score|default:0 }}"
+       data-squat="{{ c.best_squat|default:'' }}"
+       data-bench="{{ c.best_bench|default:'' }}"
+       data-deadlift="{{ c.best_deadlift|default:'' }}"></i>
+    {% endfor %}
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var nodes = Array.prototype.slice.call(document.querySelectorAll('#poolData i'));
+  var pool = nodes.map(function (n) {
+    return {
+      id:       n.dataset.id,
+      self:     n.dataset.self === '1',
+      name:     n.dataset.name,
+      gender:   n.dataset.gender,
+      weight:   n.dataset.weight,
+      division: n.dataset.division,
+      category: n.dataset.category,
+      total:    parseFloat(n.dataset.total)    || 0,
+      dots:     parseFloat(n.dataset.dots)     || 0,
+      squat:    n.dataset.squat    === '' ? null : parseFloat(n.dataset.squat),
+      bench:    n.dataset.bench    === '' ? null : parseFloat(n.dataset.bench),
+      deadlift: n.dataset.deadlift === '' ? null : parseFloat(n.dataset.deadlift)
+    };
+  });
+
+  var you = pool.filter(function (a) { return a.self; })[0];
+  if (!you) return;
+
+  var metric   = 'dots';  // 'dots' | 'total'
+  var scope    = 'all';   // 'all' | 'weight' | 'category'
+  var expanded = null;
+
+  function valOf(a, m) { return m === 'dots' ? a.dots : a.total; }
+
+  function fmt(v, m) {
+    return m === 'dots' ? v.toFixed(1) : (Math.round(v) + ' kg');
+  }
+
+  function fmtGap(v, m) {
+    if (v === 0) return '0';
+    var s = v > 0 ? '+' : '−';
+    return s + (m === 'dots' ? Math.abs(v).toFixed(1) : (Math.round(Math.abs(v)) + ' kg'));
+  }
+
+  function rankPool(m, sc) {
+    var p = pool.filter(function (a) { return a.gender === you.gender; });
+    if (sc === 'weight')   p = p.filter(function (a) { return a.weight   === you.weight; });
+    if (sc === 'category') p = p.filter(function (a) { return a.category === you.category; });
+    p.sort(function (x, y) { return valOf(y, m) - valOf(x, m); });
+    return p;
+  }
+
+  function summaryFor(m, elRank, elGap) {
+    var p   = rankPool(m, scope);
+    var idx = p.map(function (a) { return a.id; }).indexOf(you.id);
+    elRank.textContent = 'Rank #' + (idx + 1) + ' of ' + p.length;
+    if (idx === 0) {
+      elGap.textContent = 'Leading the field';
+      elGap.className   = 'sum-gap lead';
+    } else {
+      var gap = valOf(you, m) - valOf(p[0], m);
+      elGap.textContent = fmtGap(gap, m) + ' to #1';
+      elGap.className   = 'sum-gap behind';
+    }
+  }
+
+  function buildDetail(them) {
+    var lifts = [];
+    if (them.squat    != null && you.squat    != null) lifts.push(['Squat',    them.squat,    you.squat,    'kg']);
+    if (them.bench    != null && you.bench    != null) lifts.push(['Bench',    them.bench,    you.bench,    'kg']);
+    if (them.deadlift != null && you.deadlift != null) lifts.push(['Deadlift', them.deadlift, you.deadlift, 'kg']);
+    lifts.push(['Total', them.total, you.total, 'kg']);
+    lifts.push(['DOTS',  them.dots,  you.dots,  'dots']);
+
+    var head = '<div class="det-head"><span>Lift</span><span>' +
+      them.name.split(' ')[0] + '</span><span>You</span><span>Δ</span></div>';
+
+    var rows = lifts.map(function (L) {
+      var t = L[1], y = L[2], unit = L[3];
+      var dv  = y - t;
+      var f   = function (n) { return unit === 'dots' ? n.toFixed(1) : String(Math.round(n)); };
+      var cls = dv > 0 ? 'ahead' : (dv < 0 ? 'behind' : 'even');
+      var ds  = (dv > 0 ? '+' : (dv < 0 ? '−' : '')) +
+                (unit === 'dots' ? Math.abs(dv).toFixed(1) : String(Math.round(Math.abs(dv))));
+      return '<div class="det-row">' +
+        '<span class="det-lift">'  + L[0]   + '</span>' +
+        '<span class="det-them">'  + f(t)   + '</span>' +
+        '<span class="det-you">'   + f(y)   + '</span>' +
+        '<span class="det-delta '  + cls + '">' + ds + '</span>' +
+        '</div>';
+    }).join('');
+
+    return '<div class="lb-detail">' + head + rows + '</div>';
+  }
+
+  function render() {
+    // Segmented control active states
+    Array.prototype.forEach.call(document.querySelectorAll('#metricSeg button'), function (b) {
+      b.classList.toggle('active', b.dataset.v === metric);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#scopeSeg button'), function (b) {
+      b.classList.toggle('active', b.dataset.v === scope);
+    });
+
+    // Summary cards
+    summaryFor('total', document.getElementById('totalRank'), document.getElementById('totalGap'));
+    summaryFor('dots',  document.getElementById('dotsRank'),  document.getElementById('dotsGap'));
+
+    // Leaderboard
+    var p       = rankPool(metric, scope);
+    var selfIdx = p.map(function (a) { return a.id; }).indexOf(you.id);
+
+    document.getElementById('lbTitle').textContent =
+      (metric === 'dots' ? 'DOTS' : 'Total') + ' Leaderboard';
+    document.getElementById('lbCount').textContent =
+      '#' + (selfIdx + 1) + ' of ' + p.length;
+
+    var yv   = valOf(you, metric);
+    var html = p.map(function (a, i) {
+      var pv     = valOf(a, metric);
+      var gap    = yv - pv;
+      var isSelf = a.id === you.id;
+      var open   = expanded === a.id;
+
+      var gapHtml = isSelf
+        ? '<span class="lb-gap you">YOU</span>'
+        : '<span class="lb-gap ' + (gap > 0 ? 'ahead' : (gap < 0 ? 'behind' : 'even')) + '">' +
+          fmtGap(gap, metric) + '</span>';
+
+      var caret = isSelf ? '' : '<span class="lb-caret">⌄</span>';
+
+      return '<div class="lb-item' + (isSelf ? ' self' : '') + (open ? ' open' : '') +
+        '" data-id="' + a.id + '">' +
+        '<div class="lb-row' + (isSelf ? ' no-exp' : '') + '">' +
+          '<span class="lb-rank">#' + (i + 1) + '</span>' +
+          '<div class="lb-main">' +
+            '<div class="lb-name">' + a.name + '</div>' +
+            '<div class="lb-sub">' + a.weight + ' · ' + a.division + '</div>' +
+          '</div>' +
+          '<span class="lb-value">' + fmt(pv, metric) + '</span>' +
+          gapHtml + caret +
+        '</div>' +
+        (isSelf ? '' : buildDetail(a)) +
+        '</div>';
+    }).join('');
+
+    document.getElementById('leaderboard').innerHTML = html;
+
+    // Row expand handlers
+    Array.prototype.forEach.call(
+      document.querySelectorAll('#leaderboard .lb-item:not(.self) .lb-row'),
+      function (row) {
+        row.addEventListener('click', function () {
+          var id = row.parentNode.dataset.id;
+          expanded = (expanded === id) ? null : id;
+          render();
+        });
+      }
+    );
+  }
+
+  document.getElementById('metricSeg').addEventListener('click', function (e) {
+    if (e.target.dataset.v) { metric = e.target.dataset.v; expanded = null; render(); }
+  });
+  document.getElementById('scopeSeg').addEventListener('click', function (e) {
+    if (e.target.dataset.v) { scope = e.target.dataset.v; expanded = null; render(); }
+  });
+
+  // Refresh button — reloads the page so Django re-queries the DB
+  document.getElementById('refreshBtn').addEventListener('click', function () {
+    var btn = this;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add('loading');
+    document.getElementById('refreshLabel').textContent = 'Updating…';
+    document.getElementById('refreshMeta').textContent  = 'Fetching latest results…';
+    window.location.reload();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

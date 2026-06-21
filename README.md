@@ -1,14 +1,14 @@
 # **PROJECT GOAL**
 
-    The goal is to provide a less experienced competitor or coach handling many athletes with the tools to make better decisions in the minute they are allowed to declare an attempt.The data is readily available on lifting cast, but without the help of a handler or while tracking multiple athletes, this information can be overwhelming
+The goal is to provide a less experienced competitor or coach handling many athletes with the tools to make better decisions in the minute they are allowed to declare an attempt.The data is readily available on lifting cast, but without the help of a handler or while tracking multiple athletes, this information can be overwhelming
 
 ---
 
 ## Overview
 
-    The repository demonstrates the full workflow from**proof-of-concept experimentation in Jupyter** to **modular, reusable scraping functions** designed for scalable data collection.
+The repository demonstrates the full workflow from**proof-of-concept experimentation in Jupyter** to **modular, reusable scraping functions** designed for scalable data collection.
 
-    Because LiftingCast renders results client side and exposes semi-structured athlete data, traditional static scraping approaches are insufficient. This project uses**Selenium-driven browser automation** to reliably interact with the UI, trigger exports, and collect athlete-level results
+Because LiftingCast renders results client side and exposes semi-structured athlete data, traditional static scraping approaches are insufficient. This project uses**Selenium-driven browser automation** to reliably interact with the UI, trigger exports, and collect athlete-level results
 
 ---
 
@@ -108,3 +108,14 @@ athlete data is stored in CSVs which are can be formatted slightly different bet
 -  data transformation and feature engineering for machine learning algorithms to predict if and how an athlete will fail a lift
 
 ---
+### running application
+
+- git clone
+
+- cd powerliftingcomphandler
+
+- python manage.py migrate
+
+- python manage.py scrape_competitions
+
+- python manage.py runserver
