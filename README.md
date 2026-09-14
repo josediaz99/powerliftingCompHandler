@@ -6,7 +6,7 @@ The goal is to provide a less experienced competitor or coach handling many athl
 
 ## Overview
 
-The repository demonstrates the full workflow from**proof-of-concept experimentation in Jupyter** to **modular, reusable scraping functions** designed for scalable data collection.
+The repository demonstrates the full workflow from **proof-of-concept experimentation in Jupyter** to **modular, reusable scraping functions** designed for scalable data collection.
 
 Because LiftingCast renders results client side and exposes semi-structured athlete data, traditional static scraping approaches are insufficient. This project uses**Selenium-driven browser automation** to reliably interact with the UI, trigger exports, and collect athlete-level results
 
@@ -16,23 +16,23 @@ Because LiftingCast renders results client side and exposes semi-structured athl
 
 The notebooks demonstrates a proof of concept of scraping LiftingCast by:
 
-* Launching Selenium with a configured download directory
-* Navigating to a competition results page
-* Handling dynamic React rendered content
-* Opening the export modal
-* Clicking the export button
-* Waiting for the athlete CSV to fully download
-* Validating the downloaded file
+- Launching Selenium with a configured download directory
+- Navigating to a competition results page
+- Handling dynamic React rendered content
+- Opening the export modal
+- Clicking the export button
+- Waiting for the athlete CSV to fully download
+- Validating the downloaded file
 
 ##### **Purpose of the ipynb files**
 
 The notebooks exists to:
 
-* Validate selectors and page behavior
-* Reverse engineer the export workflow
-* Handle timing and modal interactions
-* Prototype download completion logic
-* Reduce risk before productionizing
+- Validate selectors and page behavior
+- Reverse engineer the export workflow
+- Handle timing and modal interactions
+- Prototype download completion logic
+- Reduce risk before productionizing
 
 This step ensures the production scraper is built on verified browser automation behavior
 
@@ -40,31 +40,31 @@ This step ensures the production scraper is built on verified browser automation
 
 After validating the workflow in the notebook, the logic is being refactored into reusable functions that will:
 
-* Scale across many competitions
-* Improve reliability and error handling
-* Support batch data collection
-* Enable downstream database ingestion
+- Scale across many competitions
+- Improve reliability and error handling
+- Support batch data collection
+- Enable downstream database ingestion
 
 ##### **Core Responsibilities**
 
 The production modules will:
 
-* Initialize and manage WebDriver sessions
-* Navigate competition pages
-* Handle dynamic UI elements
-* Trigger and monitor exports
-* Parse semi-structured athlete data
-* Standardize outputs for analysis
+- Initialize and manage WebDriver sessions
+- Navigate competition pages
+- Handle dynamic UI elements
+- Trigger and monitor exports
+- Parse semi-structured athlete data
+- Standardize outputs for analysis
 
 ##### Reliable File Downloads
 
 The scraper implements filesystem monitoring to:
 
-* Detect `.crdownload` temporary files
-* Wait for download completion
-* Prevent partial file reads
-* Ensure deterministic pipeline behavior
-* Remove files once ingested
+- Detect `.crdownload` temporary files
+- Wait for download completion
+- Prevent partial file reads
+- Ensure deterministic pipeline behavior
+- Remove files once ingested
 
 ### Technical Challenges Solved
 
@@ -90,24 +90,25 @@ athlete data is stored in CSVs which are can be formatted slightly different bet
 
 ### Tech Stack
 
-* Python
-* Django
-* Selenium
-* Jupyter Notebook
-* pandas
-* Chrome WebDriver
-* BeautifulSoup4
-* sqlite3
-* html
-* css
+- Python
+- Django
+- Selenium
+- Jupyter Notebook
+- pandas
+- Chrome WebDriver
+- BeautifulSoup4
+- sqlite3
+- html
+- css
 
 ---
 
 ### Future implementation
 
--  data transformation and feature engineering for machine learning algorithms to predict if and how an athlete will fail a lift
+- data transformation and feature engineering for machine learning algorithms to predict if and how an athlete will fail a lift
 
 ---
+
 ### running application
 
 - git clone

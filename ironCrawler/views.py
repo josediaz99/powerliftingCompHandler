@@ -18,7 +18,7 @@ def _dots_gender(gender: str) -> str:
 def _dots_denominator(body_weight: float, gender: str) -> float:
     a, b, c, d, e = DOTS_COEFFS[_dots_gender(gender)]
     bw = body_weight
-    return a + b * bw + c * bw ** 2 + d * bw ** 3 + e * bw ** 4
+    return a + (b * bw) + (c * bw ** 2) + (d * bw ** 3) + (e * bw ** 4)
 
 
 def total_needed_for_dots(target_dots: float, body_weight: float, gender: str) -> float:

@@ -26,16 +26,19 @@ def get_random_user() -> str:
     return user
 
 ############################# MAIN WEB DRIVER FUNCTIONS ######################################
-def create_webdriver() -> webdriver.Chrome:
+def create_webdriver(download_dir: str = None) -> webdriver.Chrome:
     """function creates a selenium driver for user to scrape dynamic content
+
+    Args:
+        download_dir (str): directory for browser downloads. Defaults to <cwd>/data.
     Returns:
        driver (webdriver.chrome): a selenium webdriver for scraping dynamic content
     """
 
     user_agent = get_random_user()
 
-    # create folder to store competition data
-    download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
+    if download_dir is None:
+        download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
     os.makedirs(download_dir, exist_ok=True)
 
     options = Options()

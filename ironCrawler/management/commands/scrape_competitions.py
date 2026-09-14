@@ -1,7 +1,7 @@
 """
 ironCrawler/management/commands/scrape_competitions.py
 
-loops over every competition on lifting cast which is sceduled within
+loops over every competition on lifting cast which is scheduled within
 the next week and stores them to database and removing those which
 have past
 
@@ -10,7 +10,7 @@ Usage:
 """
 
 from django.core.management.base import BaseCommand
-from ironCrawler.scraper import scrape_and_load
+from ironCrawler.webscraping.scraper import scrape_and_load
 
 
 class Command(BaseCommand):

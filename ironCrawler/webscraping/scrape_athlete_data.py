@@ -8,6 +8,8 @@ Run via: python manage.py scrape_athlete_data
 import csv
 import glob
 import os
+import shutil
+import tempfile
 import time
 from pathlib import Path
 # web scraping + selenium specific libraires
@@ -17,7 +19,7 @@ from selenium.webdriver.support import expected_conditions as EC
 # custom modules
 from .create_selenium_driver import create_webdriver
 # django
-from .models import Athlete, Competition
+from ..models import Athlete, Competition
 ####################################### HELPER FUNCTIONS ############################################
 
 def clean_athlete_csv(file_path: str) -> list:
@@ -141,9 +143,20 @@ def save_athletes_to_db(competition: Competition, athletes_data: list):
         )
 ################################### MAIN ATHLETE DATA FUNCTIONS ####################################
 
-def get_athlete_csv(link: str):
-    driver = create_webdriver()
-    download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
+def get_athlete_csv(link: str, download_dir: str = None):
+    """Uses a webdriver to navigate to a competition page and download its CSV export.
+
+    Args:
+        link (str): competition URL on liftingcast.com
+        download_dir (str): directory for the downloaded CSV. Each concurrent caller
+            should pass its own isolated temp directory to avoid file collisions.
+
+    Returns:
+        str: path to the downloaded CSV file
+    """
+    if download_dir is None:
+        download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
+    driver = create_webdriver(download_dir)
     # snapshot existing csv files before starting
     before = set(glob.glob(os.path.join(download_dir, "*.csv")))
 
@@ -169,18 +182,23 @@ def get_athlete_csv(link: str):
 def scrape_and_save_athletes(competition: Competition):
     """Scrapes athlete data from a competition URL and saves to database.
 
+    Each call gets its own isolated temp directory so concurrent calls don't
+    race when downloading CSVs.
+
     Args:
         competition (Competition): The competition to scrape athletes for.
     """
+    download_dir = tempfile.mkdtemp(prefix="lc_athlete_")
     try:
-        csv_path = get_athlete_csv(competition.comp_url)
+        csv_path = get_athlete_csv(competition.comp_url, download_dir)
         athletes_data = athlete_data_to_dicts(csv_path)
         save_athletes_to_db(competition, athletes_data)
-        remove_csv(csv_path)
         return len(athletes_data)
     except Exception as e:
         print(f"Error scraping athletes for {competition}: {e}")
         return 0
+    finally:
+        shutil.rmtree(download_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     test_url = "https://liftingcast.com/meets/m3vj5jy9paz9/results"
