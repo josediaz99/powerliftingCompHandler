@@ -5,18 +5,20 @@ scrapes upcoming competition data from lifting cast main page
 Run via: python manage.py scrape_competition_data --url <meet url>
 """
 # standard libraries
-from datetime import datetime, timedelta
 import re
+from datetime import datetime, timedelta
+
 # web scraping + selenium specific libraires
 from bs4 import BeautifulSoup
-from .create_selenium_driver import create_webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
+from .create_selenium_driver import create_webdriver
 
 ##################################### HELPER FUNCTIONS #####################################
 
-def parse_mmddyyyy(value) -> datetime.date:
+def _parse_mmddyyyy(value) -> datetime.date:
     """
     Accepts: '02/26/2026', '2/6/2026', or None/''.
     Returns: datetime.date or None
@@ -37,18 +39,18 @@ def parse_mmddyyyy(value) -> datetime.date:
     except ValueError:
         return None  # or raise, depending on how strict you want it
 
-def to_iso_date(value) -> datetime.date:
+def _to_iso_date(value) -> datetime.date:
     """Returns 'YYYY-MM-DD' or None"""
-    d = parse_mmddyyyy(value)
+    d = _parse_mmddyyyy(value)
     return d.isoformat() if d else None
 
-def date_in_days(days:int):
+def _date_in_days(days:int):
     '''
     using datetime and delta we calculate the future date from the number of days were looking for
     '''
     return (datetime.today() + timedelta(days=days)).date()
 
-def parse_competitions(competition_table_rows: list)-> list:
+def _parse_competitions(competition_table_rows: list)-> list:
     """function takes list of html table rows and extracts competition data as a lift of dicts
 
     Args:
@@ -60,7 +62,7 @@ def parse_competitions(competition_table_rows: list)-> list:
     base_url = "https://liftingcast.com"
 
     date_range = 7
-    last_date = date_in_days(date_range)
+    last_date = _date_in_days(date_range)
 
     compe_list = []
     for competition in competition_table_rows:
@@ -77,7 +79,7 @@ def parse_competitions(competition_table_rows: list)-> list:
             if date >= datetime.today().date() and date <= last_date:
                 comp = {'name': name,
                         'link': base_url + link,
-                        'date': to_iso_date(raw_date)}
+                        'date': _to_iso_date(raw_date)}
                 compe_list.append(comp)
             else:
                 break
@@ -89,7 +91,8 @@ def parse_competitions(competition_table_rows: list)-> list:
 ###################################### MAIN SCRAPER FUNCTIONS ######################################
 
 def get_html(driver) -> list:
-    """function uses chrome driver to get html source code of lifting cast main page
+    """function uses chrome driver to get html source code of lifting cast main page and wait
+    for tables and links to be generated 
 
     Args:
         driver (chrome.driver): selenium chrome driver
@@ -117,14 +120,9 @@ def get_competition_data() -> list:
     Returns:
         competition_list: competition list of dicts with name, link and date
     """
-
-    html = get_html(create_webdriver())
+    driver = create_webdriver()
+    html = get_html(driver)
     soup = BeautifulSoup(html, 'html.parser')
     rows = soup.find_all('tr')[2:]# remove the first 2 rows (not competition data)
 
-    return parse_competitions(rows)
-
-if __name__ == "__main__":
-    comps = get_competition_data()
-    for comp in comps:
-        print(comp)
+    return _parse_competitions(rows)

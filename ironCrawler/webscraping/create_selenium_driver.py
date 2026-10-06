@@ -4,13 +4,16 @@ ironCrawler/web_driver.py
 Contains helper functions for creating and configuring selenium webdrivers for 
 data wrangling and downloading from dynamic content.
 """
-import random
 import os
+import random
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+
 
 ############################# HELPER FUNCTIONS ############################################
-def get_random_user() -> str:
+def _get_random_user() -> str:
     """returns a randomized user agent as a string for selenium driver
 
     Returns:
@@ -25,6 +28,16 @@ def get_random_user() -> str:
     user = base + random.choice(user_agent)
     return user
 
+def _ensure_directory_exists(data_dir) -> None:
+    """creates a directory to hold data
+
+    Args:
+        data_dir : directory to hold csv file
+    """
+    if data_dir is None:
+        data_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
+        os.makedirs(data_dir, exist_ok=True)
+
 ############################# MAIN WEB DRIVER FUNCTIONS ######################################
 def create_webdriver(download_dir: str = None) -> webdriver.Chrome:
     """function creates a selenium driver for user to scrape dynamic content
@@ -35,11 +48,9 @@ def create_webdriver(download_dir: str = None) -> webdriver.Chrome:
        driver (webdriver.chrome): a selenium webdriver for scraping dynamic content
     """
 
-    user_agent = get_random_user()
+    user_agent = _get_random_user()
 
-    if download_dir is None:
-        download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
-    os.makedirs(download_dir, exist_ok=True)
+    _ensure_directory_exists(download_dir)
 
     options = Options()
     options.add_argument("--headless=new")
@@ -56,7 +67,7 @@ def create_webdriver(download_dir: str = None) -> webdriver.Chrome:
         "safebrowsing.enabled": True,
     })
 
-    driver = webdriver.Chrome(options=options)
+    driver = webdriver.Chrome(service=Service(), options=options)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     # allow headless downloads
     driver.execute_cdp_cmd( "Page.setDownloadBehavior",

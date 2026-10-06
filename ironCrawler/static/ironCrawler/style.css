@@ -775,6 +775,43 @@ header { margin-bottom: 22px; }
 .det-delta.even   { color: var(--text-dim); }
 
 
+/* ── Landscape two-column layout (athlete_dash) ─────── */
+.dash-layout { display: contents; }
+.dash-left, .dash-right { display: contents; }
+
+@media (orientation: landscape) and (min-width: 600px) {
+  .page {
+    max-width: 1024px;
+    padding: 24px 24px 40px;
+  }
+
+  .dash-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .dash-left {
+    display: block;
+    position: sticky;
+    top: 24px;
+  }
+
+  .dash-right {
+    display: block;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  /* tighten vertical rhythm on the left panel in landscape */
+  .dash-left .refresh-wrap { margin-top: 14px; }
+  .dash-left .summary      { margin-top: 12px; }
+  .dash-left .controls     { margin-top: 14px; }
+}
+
+
 /* ══════════════════════════════════════════════════════
    SHARED UTILITIES
    ══════════════════════════════════════════════════════ */

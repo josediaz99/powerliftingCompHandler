@@ -7,22 +7,28 @@ Run via: python manage.py scrape_athlete_data
 
 import csv
 import glob
+import logging
 import os
 import shutil
 import tempfile
 import time
 from pathlib import Path
+
 # web scraping + selenium specific libraires
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-# custom modules
-from .create_selenium_driver import create_webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+
 # django
 from ..models import Athlete, Competition
+
+# custom modules
+from .create_selenium_driver import create_webdriver
+
+logger = logging.getLogger(__name__)
 ####################################### HELPER FUNCTIONS ############################################
 
-def clean_athlete_csv(file_path: str) -> list:
+def _clean_athlete_csv(file_path: str) -> list:
     """reads csv and returns a cleaned list of headers and athlete data
 
     Args:
@@ -47,7 +53,7 @@ def clean_athlete_csv(file_path: str) -> list:
     header = cleaned_athletes[0]
     return header, cleaned_athletes[1:]
 
-def athlete_data_to_dicts(file_path:str) -> list:
+def _athlete_data_to_dicts(file_path:str) -> list:
     """converts cleaned athlete csv to a list of athlete dicts
 
     Args:
@@ -57,10 +63,10 @@ def athlete_data_to_dicts(file_path:str) -> list:
         athletes_list: list of athlete dictionaries
     """
 
-    header, athletes = clean_athlete_csv(file_path)
+    header, athletes = _clean_athlete_csv(file_path)
     return [dict(zip(header, athlete)) for athlete in athletes]
 
-def wait_for_new_csv(download_dir: str, before_files: set[str], timeout: int = 90) -> str:
+def _wait_for_new_csv(download_dir: str, before_files: set[str], timeout: int = 90) -> str:
     end = time.time() + timeout
     while time.time() < end:
         # if still downloading
@@ -77,14 +83,6 @@ def wait_for_new_csv(download_dir: str, before_files: set[str], timeout: int = 9
 
     raise TimeoutError("CSV download did not complete in time.")
 
-def remove_csv(csv_path: str):
-    """helper function to remove csv file after processing
-
-    Args:
-        csv_path (str): file path to csv file to be removed
-    """
-    Path(csv_path).unlink(missing_ok=True)
-
 def _to_float(value: str) -> float:
     """Converts a CSV numeric field to a float, treating blanks/dashes as 0."""
     value = (value or '').strip()
@@ -95,7 +93,6 @@ def _to_float(value: str) -> float:
     except ValueError:
         return 0.0
 
-
 def _to_best_lift(value: str) -> float:
     """Converts a 'Best Squat/Bench/Deadlift' CSV field to a float.
 
@@ -104,8 +101,7 @@ def _to_best_lift(value: str) -> float:
     """
     return max(0.0, _to_float(value))
 
-
-def save_athletes_to_db(competition: Competition, athletes_data: list):
+def _save_athletes_to_db(competition: Competition, athletes_data: list):
     """Saves a list of athlete dictionaries to the database, linked to the given competition.
 
     Args:
@@ -143,7 +139,7 @@ def save_athletes_to_db(competition: Competition, athletes_data: list):
         )
 ################################### MAIN ATHLETE DATA FUNCTIONS ####################################
 
-def get_athlete_csv(link: str, download_dir: str = None):
+def _get_athlete_csv(link: str, download_dir: str = None):
     """Uses a webdriver to navigate to a competition page and download its CSV export.
 
     Args:
@@ -175,35 +171,31 @@ def get_athlete_csv(link: str, download_dir: str = None):
         )))
     driver.execute_script("arguments[0].click();", modal_export)
 
-    csv_path = wait_for_new_csv(download_dir, before, timeout=120)
+    csv_path = _wait_for_new_csv(download_dir, before, timeout=120)
     driver.quit()
     return csv_path
 
-def scrape_and_save_athletes(competition: Competition):
-    """Scrapes athlete data from a competition URL and saves to database.
+def scrape_athletes_only(competition: Competition) -> tuple:
+    """Scrapes athlete data from a competition URL and returns it without touching the DB.
 
-    Each call gets its own isolated temp directory so concurrent calls don't
-    race when downloading CSVs.
+    Safe to call from worker threads — no database access.
 
     Args:
         competition (Competition): The competition to scrape athletes for.
+
+    Returns:
+        (competition, athletes_data, error) where error is None on success or
+        an error message string on failure (athletes_data will be []).
     """
+    logger.info("Scraping athletes for: %s", competition)
     download_dir = tempfile.mkdtemp(prefix="lc_athlete_")
+
     try:
-        csv_path = get_athlete_csv(competition.comp_url, download_dir)
-        athletes_data = athlete_data_to_dicts(csv_path)
-        save_athletes_to_db(competition, athletes_data)
-        return len(athletes_data)
+        csv_path = _get_athlete_csv(competition.comp_url, download_dir)
+        athletes_data = _athlete_data_to_dicts(csv_path)
+        return competition, athletes_data, None
     except Exception as e:
-        print(f"Error scraping athletes for {competition}: {e}")
-        return 0
+        logger.error("Failed to scrape athletes for %s: %s", competition, e)
+        return competition, [], str(e)
     finally:
         shutil.rmtree(download_dir, ignore_errors=True)
-
-if __name__ == "__main__":
-    test_url = "https://liftingcast.com/meets/m3vj5jy9paz9/results"
-    path = get_athlete_csv(test_url)
-    athletes = athlete_data_to_dicts(path)
-    for athlete in athletes:
-        print(athlete)
-    remove_csv(path)

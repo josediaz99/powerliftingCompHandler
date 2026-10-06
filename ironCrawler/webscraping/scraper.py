@@ -12,9 +12,13 @@ Behaviour:
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from ironCrawler.webscraping.scrape_competition_data import get_competition_data
-from ironCrawler.webscraping.scrape_athlete_data import scrape_and_save_athletes
+
 from ironCrawler.models import Competition
+from ironCrawler.webscraping.scrape_athlete_data import (
+    save_athletes_to_db,
+    scrape_athletes_only,
+)
+from ironCrawler.webscraping.scrape_competition_data import get_competition_data
 
 # Each worker is a full Chrome instance — keep this low to avoid OOM.
 MAX_SCRAPE_WORKERS = 4
@@ -22,7 +26,7 @@ MAX_SCRAPE_WORKERS = 4
 logger = logging.getLogger(__name__)
 
 
-def scrape_and_load() -> tuple[int, int, int]:
+def scrape_and_load() -> tuple[int, int, int, list[str]]:
     """
     Scrapes liftingcast.com for upcoming competitions and syncs them with
     the Competition table. Then scrapes athletes for all competitions.
@@ -30,17 +34,24 @@ def scrape_and_load() -> tuple[int, int, int]:
     - New competitions are created.
     - Competitions no longer returned by the scraper are deleted.
     - Athletes are scraped and saved for all competitions.
+    - Competitions whose athlete scrape fails are collected and returned
+      so callers can log/alert without blocking the rest of the run.
 
     Returns:
-        (created_count, skipped_count, athletes_count)
+        (created_count, skipped_count, athletes_count, failed_competitions)
     """
-    logger.info("Starting competition scrape...")
+    # ── Step 1: fetch competition list ────────────────────────────────────
+    logger.info("Step 1/3 — Fetching competition list from liftingcast.com...")
     live_competitions = get_competition_data()
 
     if not live_competitions:
         logger.warning("Scraper returned no competitions — skipping DB sync to avoid wiping data.")
-        return 0, 0, 0
+        return 0, 0, 0, []
 
+    logger.info("Step 1/3 complete — found %d competitions on liftingcast.com", len(live_competitions))
+
+    # ── Step 2: sync competitions with the DB ─────────────────────────────
+    logger.info("Step 2/3 — Syncing competition list with database...")
     created  = 0
     skipped  = 0
     live_keys = set()   # (name, date) pairs seen in this scrape run
@@ -60,35 +71,58 @@ def scrape_and_load() -> tuple[int, int, int]:
 
         if was_created:
             created += 1
-            logger.info("Created: %s (%s)", name, date)
+            logger.info("  [new] %s (%s)", name, date)
         else:
             skipped += 1
-            logger.debug("Already exists: %s (%s)", name, date)
-
-    # ── Remove stale competitions (no longer on liftingcast) ──────────────
+            logger.debug("  [exists] %s (%s)", name, date)
 
     # More precise: only delete if BOTH name AND date are absent
     stale_qs = Competition.objects.all()
     for comp_obj in stale_qs:
         if (comp_obj.comp_name, str(comp_obj.comp_date)) not in live_keys:
-            logger.info("Removing stale competition: %s (%s)", comp_obj.comp_name, comp_obj.comp_date)
+            logger.info("  [removed stale] %s (%s)", comp_obj.comp_name, comp_obj.comp_date)
             comp_obj.delete()
 
-    logger.info("Competition sync complete — created: %d, skipped: %d", created, skipped)
+    logger.info("Step 2/3 complete — competitions created: %d, skipped: %d", created, skipped)
 
-    # ── Scrape athletes for all competitions (parallel) ───────────────────
-    logger.info("Starting athlete scrape...")
-    athletes_total = 0
+    # ── Step 3: scrape athletes (parallel scrape, serial DB write) ────────
+    # Workers only do network/browser work — no DB access — to avoid SQLite
+    # "database is locked" errors from concurrent writes.
     competitions = list(Competition.objects.all())
     n_workers = min(MAX_SCRAPE_WORKERS, len(competitions)) if competitions else 1
+    logger.info("Step 3/3 — Scraping athletes for %d competitions (%d parallel workers)...", len(competitions), n_workers)
+
+    athletes_total = 0
+    failed_comps: list[str] = []
+    scraped_results: list[tuple] = []
 
     with ThreadPoolExecutor(max_workers=n_workers) as pool:
-        futures = {pool.submit(scrape_and_save_athletes, comp): comp for comp in competitions}
+        futures = {pool.submit(scrape_athletes_only, comp): comp for comp in competitions}
         for future in as_completed(futures):
-            comp = futures[future]
-            count = future.result()  # exceptions are caught inside scrape_and_save_athletes
-            athletes_total += count
-            logger.info("Saved %d athletes for %s", count, comp)
+            comp, athletes_data, error = future.result()
+            if error:
+                failed_comps.append(str(comp))
+                logger.warning("  [failed] %s — %s", comp, error)
+            else:
+                scraped_results.append((comp, athletes_data))
+                logger.info("  [scraped] %s — %d athletes found", comp, len(athletes_data))
 
-    logger.info("Full sync complete — competitions created: %d, skipped: %d, athletes: %d", created, skipped, athletes_total)
-    return created, skipped, athletes_total
+    for comp, athletes_data in scraped_results:
+        save_athletes_to_db(comp, athletes_data)
+        athletes_total += len(athletes_data)
+        logger.info("  [saved] %s — %d athletes written to DB", comp, len(athletes_data))
+
+    if failed_comps:
+        logger.warning(
+            "Step 3/3 complete with %d failure(s): %s",
+            len(failed_comps),
+            ", ".join(failed_comps),
+        )
+    else:
+        logger.info("Step 3/3 complete — all competitions scraped successfully")
+
+    logger.info(
+        "Full sync complete — competitions created: %d, skipped: %d, athletes: %d, failed: %d",
+        created, skipped, athletes_total, len(failed_comps),
+    )
+    return created, skipped, athletes_total, failed_comps

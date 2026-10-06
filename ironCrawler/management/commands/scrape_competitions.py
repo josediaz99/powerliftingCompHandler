@@ -10,6 +10,7 @@ Usage:
 """
 
 from django.core.management.base import BaseCommand
+
 from ironCrawler.webscraping.scraper import scrape_and_load
 
 
@@ -19,9 +20,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("Fetching competitions from liftingcast.com and syncing with database...")
 
-        created, skipped, athletes = scrape_and_load()
+        created, skipped, athletes, failed = scrape_and_load()
 
-        self.stdout.write(self.style.SUCCESS(f"\nSync complete:"))
+        self.stdout.write(self.style.SUCCESS("\nSync complete:"))
         self.stdout.write(f"  - Competitions created: {created}")
         self.stdout.write(f"  - Competitions skipped: {skipped}")
-        self.stdout.write(f"  - Athletes scraped: {athletes}")
+        self.stdout.write(f"  - Athletes scraped:     {athletes}")
+        self.stdout.write(f"  - Failed scrapes:       {len(failed)}")
+        if failed:
+            self.stdout.write(self.style.WARNING("  Failed competitions:"))
+            for name in failed:
+                self.stdout.write(self.style.WARNING(f"    • {name}"))

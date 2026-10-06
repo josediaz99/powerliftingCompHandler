@@ -39,3 +39,13 @@ implement proper scheduling & frequency
     - no need to recomend when there is no more lifts which contribute to the total
   - determine when athletes are done competing
     - improve the attempt selection for the rest of the competitors
+
+# Implrove the logging
+
+- add a remove log for competitions and athletes after each scrape
+- log each step of the web scraping portion to ensure which competitons or formats break
+
+# dashboard
+
+- when selecting total only count also filter for weight class
+- ensure there is a check box not a radio for the compare filter

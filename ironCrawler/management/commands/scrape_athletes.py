@@ -9,9 +9,11 @@ Usage:
     python manage.py scrape_athletes
 """
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
+
 from ironCrawler.models import Competition
 from ironCrawler.webscraping.scrape_athlete_data import scrape_and_save_athletes
+
 
 class Command(BaseCommand):
     help = "Scrapes athlete data for all competitions in the database."

@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class Competition(models.Model):
     comp_id   = models.AutoField(primary_key=True)
     comp_name = models.CharField(max_length=255)
