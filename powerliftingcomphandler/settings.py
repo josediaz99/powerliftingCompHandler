@@ -155,17 +155,26 @@ LOGGING = {
             "backupCount": 5,
             "formatter": "verbose",
         },
+        # High-priority only: competitions that failed every scrape attempt
+        "failures_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": str(LOGS_DIR / "scrape_failures.log"),
+            "maxBytes": 5 * 1024 * 1024,
+            "backupCount": 5,
+            "formatter": "verbose",
+            "level": "ERROR",
+        },
     },
     "loggers": {
         # Scheduler jobs (start/stop, per-job results, failures)
         "ironCrawler.scheduler": {
-            "handlers": ["console", "scheduler_file"],
+            "handlers": ["console", "scheduler_file", "failures_file"],
             "level": "INFO",
             "propagate": False,
         },
         # Everything else in ironCrawler (scraper steps, athlete data)
         "ironCrawler": {
-            "handlers": ["console", "scraper_file"],
+            "handlers": ["console", "scraper_file", "failures_file"],
             "level": "INFO",
             "propagate": False,
         },

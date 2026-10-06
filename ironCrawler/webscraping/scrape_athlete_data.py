@@ -26,6 +26,10 @@ from ..models import Athlete, Competition
 from .create_selenium_driver import create_webdriver
 
 logger = logging.getLogger(__name__)
+
+# total tries per competition before it is logged as a critical failure
+SCRAPE_ATTEMPTS = 2
+RETRY_DELAY_SECONDS = 5
 ####################################### HELPER FUNCTIONS ############################################
 
 def _clean_athlete_csv(file_path: str) -> list:
@@ -38,7 +42,7 @@ def _clean_athlete_csv(file_path: str) -> list:
         and athletes_list is a list of cleaned value rows.
     """
 
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, 'r', encoding='utf-8-sig', newline='') as f:
         reader = csv.reader(f)
         raw_athletes = list(reader)
 
@@ -50,6 +54,9 @@ def _clean_athlete_csv(file_path: str) -> list:
                                  .lower() 
                                  for item in athlete])
         
+    if not cleaned_athletes:
+        return [], []
+
     header = cleaned_athletes[0]
     return header, cleaned_athletes[1:]
 
@@ -101,7 +108,7 @@ def _to_best_lift(value: str) -> float:
     """
     return max(0.0, _to_float(value))
 
-def _save_athletes_to_db(competition: Competition, athletes_data: list):
+def save_athletes_to_db(competition: Competition, athletes_data: list):
     """Saves a list of athlete dictionaries to the database, linked to the given competition.
 
     Args:
@@ -156,46 +163,84 @@ def _get_athlete_csv(link: str, download_dir: str = None):
     # snapshot existing csv files before starting
     before = set(glob.glob(os.path.join(download_dir, "*.csv")))
 
-    wait = WebDriverWait(driver, 20)
-    driver.get(link)
+    try:
+        wait = WebDriverWait(driver, 20)
+        driver.get(link)
 
-    export_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.export-button")))
-    export_btn.click()
+        export_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.export-button")))
+        export_btn.click()
 
-    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".export-results-modal")))
-    # clicking modal
-    modal_export = wait.until(
-        EC.element_to_be_clickable((
-            By.XPATH,
-            "//div[contains(@class,'export-results-modal')]//button[normalize-space()='Export' or contains(., 'Export')]"
-        )))
-    driver.execute_script("arguments[0].click();", modal_export)
+        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".export-results-modal")))
+        # clicking modal
+        modal_export = wait.until(
+            EC.element_to_be_clickable((
+                By.XPATH,
+                "//div[contains(@class,'export-results-modal')]//button[normalize-space()='Export' or contains(., 'Export')]"
+            )))
+        driver.execute_script("arguments[0].click();", modal_export)
 
-    csv_path = _wait_for_new_csv(download_dir, before, timeout=120)
-    driver.quit()
-    return csv_path
+        return _wait_for_new_csv(download_dir, before, timeout=120)
+    finally:
+        driver.quit()
 
-def scrape_athletes_only(competition: Competition) -> tuple:
+def _scrape_athletes_once(competition: Competition) -> list:
+    """Single scrape attempt in its own temp download directory. Raises on failure."""
+    download_dir = tempfile.mkdtemp(prefix="lc_athlete_")
+    try:
+        csv_path = _get_athlete_csv(competition.comp_url, download_dir)
+        return _athlete_data_to_dicts(csv_path)
+    finally:
+        shutil.rmtree(download_dir, ignore_errors=True)
+
+def scrape_athletes_only(competition: Competition, attempts: int = SCRAPE_ATTEMPTS) -> tuple:
     """Scrapes athlete data from a competition URL and returns it without touching the DB.
 
-    Safe to call from worker threads — no database access.
+    Safe to call from worker threads — no database access. A failed scrape is
+    retried (up to `attempts` total); a competition that fails every attempt is
+    logged at CRITICAL with the full traceback so it can be investigated.
 
     Args:
         competition (Competition): The competition to scrape athletes for.
+        attempts (int): total number of tries before giving up.
 
     Returns:
         (competition, athletes_data, error) where error is None on success or
         an error message string on failure (athletes_data will be []).
     """
     logger.info("Scraping athletes for: %s", competition)
-    download_dir = tempfile.mkdtemp(prefix="lc_athlete_")
 
-    try:
-        csv_path = _get_athlete_csv(competition.comp_url, download_dir)
-        athletes_data = _athlete_data_to_dicts(csv_path)
-        return competition, athletes_data, None
-    except Exception as e:
-        logger.error("Failed to scrape athletes for %s: %s", competition, e)
-        return competition, [], str(e)
-    finally:
-        shutil.rmtree(download_dir, ignore_errors=True)
+    for attempt in range(1, attempts + 1):
+        try:
+            athletes_data = _scrape_athletes_once(competition)
+            if attempt > 1:
+                logger.info("Scrape succeeded for %s on attempt %d/%d", competition, attempt, attempts)
+            return competition, athletes_data, None
+        except Exception as e:
+            if attempt < attempts:
+                logger.warning("Scrape attempt %d/%d failed for %s: %s — retrying in %ds",
+                               attempt, attempts, competition, e, RETRY_DELAY_SECONDS)
+                time.sleep(RETRY_DELAY_SECONDS)
+            else:
+                logger.critical(
+                    "SCRAPE FAILED after %d attempts — investigate: %s | url=%s | %s: %s",
+                    attempts, competition, competition.comp_url, type(e).__name__, e,
+                    exc_info=True,
+                )
+                return competition, [], f"{type(e).__name__}: {e}"
+
+def scrape_and_save_athletes(competition: Competition) -> int:
+    """Scrapes athlete data for a competition and saves it to the database.
+
+    Not thread safe (writes to the DB) — use scrape_athletes_only from worker threads.
+
+    Args:
+        competition (Competition): The competition to scrape athletes for.
+
+    Returns:
+        int: number of athletes saved (0 if the scrape failed)
+    """
+    _, athletes_data, error = scrape_athletes_only(competition)
+    if error:
+        return 0
+    save_athletes_to_db(competition, athletes_data)
+    return len(athletes_data)

@@ -28,15 +28,19 @@ def _get_random_user() -> str:
     user = base + random.choice(user_agent)
     return user
 
-def _ensure_directory_exists(data_dir) -> None:
+def _ensure_directory_exists(data_dir: str = None) -> str:
     """creates a directory to hold data
 
     Args:
-        data_dir : directory to hold csv file
+        data_dir : directory to hold csv file. Defaults to <cwd>/data.
+    Returns:
+        str: absolute path of the (now existing) directory
     """
     if data_dir is None:
-        data_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
-        os.makedirs(data_dir, exist_ok=True)
+        data_dir = os.path.join(os.getcwd(), "data")
+    data_dir = os.path.abspath(data_dir)
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
 
 ############################# MAIN WEB DRIVER FUNCTIONS ######################################
 def create_webdriver(download_dir: str = None) -> webdriver.Chrome:
@@ -50,7 +54,7 @@ def create_webdriver(download_dir: str = None) -> webdriver.Chrome:
 
     user_agent = _get_random_user()
 
-    _ensure_directory_exists(download_dir)
+    download_dir = _ensure_directory_exists(download_dir)
 
     options = Options()
     options.add_argument("--headless=new")

@@ -38,7 +38,7 @@ def live_competition_job():
     for comp in live:
         _, athletes_data, error = scrape_athletes_only(comp)
         if error:
-            logger.warning("Live refresh failed for %s: %s", comp, error)
+            logger.error("Live refresh failed after retry for %s: %s", comp, error)
         else:
             save_athletes_to_db(comp, athletes_data)
             logger.info("Live refresh complete for %s — %d athletes updated", comp, len(athletes_data))
@@ -53,7 +53,7 @@ def scrape_job():
             created, skipped, athletes, len(failed),
         )
         if failed:
-            logger.warning("Competitions that failed athlete scrape: %s", ", ".join(failed))
+            logger.error("Competitions that failed athlete scrape after retry: %s", ", ".join(failed))
     except Exception:
         logger.exception("Scheduled scrape failed")
 

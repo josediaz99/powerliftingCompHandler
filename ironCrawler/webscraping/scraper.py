@@ -102,7 +102,7 @@ def scrape_and_load() -> tuple[int, int, int, list[str]]:
             comp, athletes_data, error = future.result()
             if error:
                 failed_comps.append(str(comp))
-                logger.warning("  [failed] %s — %s", comp, error)
+                logger.error("  [failed after retry] %s — %s", comp, error)
             else:
                 scraped_results.append((comp, athletes_data))
                 logger.info("  [scraped] %s — %d athletes found", comp, len(athletes_data))
@@ -113,8 +113,8 @@ def scrape_and_load() -> tuple[int, int, int, list[str]]:
         logger.info("  [saved] %s — %d athletes written to DB", comp, len(athletes_data))
 
     if failed_comps:
-        logger.warning(
-            "Step 3/3 complete with %d failure(s): %s",
+        logger.error(
+            "Step 3/3 complete with %d failure(s) after retry: %s",
             len(failed_comps),
             ", ".join(failed_comps),
         )
