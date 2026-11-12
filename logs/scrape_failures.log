@@ -1,6 +1,0 @@
-2026-10-05 22:40:22,346 CRITICAL ironCrawler.webscraping.scrape_athlete_data — SCRAPE FAILED after 2 attempts — investigate: Fake Meet (2026-10-05) | url=https://x | TimeoutError: CSV download did not complete in time.
-Traceback (most recent call last):
-  File "C:\Users\josed\projects\powerliftingCompHandler\ironCrawler\webscraping\scrape_athlete_data.py", line 214, in scrape_athletes_only
-    athletes_data = _scrape_athletes_once(competition)
-  File "<string>", line 13, in broken
-TimeoutError: CSV download did not complete in time.
