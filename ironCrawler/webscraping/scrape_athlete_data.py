@@ -1,18 +1,18 @@
 '''
-ironCrawler/scrape_athlete_data.py
+ironCrawler/webscraping/scrape_athlete_data.py
 
 scrapes and cleans athlete data from csv exports on lifting cast competitions
-Run via: python manage.py scrape_athlete_data
+Run via: python manage.py scrape_athletes
 '''
 
 import csv
 import glob
+import hashlib
 import logging
 import os
 import shutil
 import tempfile
 import time
-from pathlib import Path
 
 # web scraping + selenium specific libraires
 from selenium.webdriver.common.by import By
@@ -20,6 +20,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 # django
+from django.db import transaction
+
 from ..models import Athlete, Competition
 
 # custom modules
@@ -30,6 +32,8 @@ logger = logging.getLogger(__name__)
 # total tries per competition before it is logged as a critical failure
 SCRAPE_ATTEMPTS = 2
 RETRY_DELAY_SECONDS = 5
+# live refresh runs every minute, so a slow export is abandoned quickly
+LIVE_CSV_TIMEOUT_SECONDS = 30
 ####################################### HELPER FUNCTIONS ############################################
 
 def _clean_athlete_csv(file_path: str) -> list:
@@ -76,8 +80,9 @@ def _athlete_data_to_dicts(file_path:str) -> list:
 def _wait_for_new_csv(download_dir: str, before_files: set[str], timeout: int = 90) -> str:
     end = time.time() + timeout
     while time.time() < end:
-        # if still downloading
-        if glob.glob(os.path.join(download_dir, "*.crdownload")):
+        # if still downloading (only the csv matters: liftingcast pages can leave an
+        # unrelated "downloads.htm.crdownload" behind that takes up to 30s to clear)
+        if glob.glob(os.path.join(download_dir, "*.csv.crdownload")):
             time.sleep(0.5)
             continue
 
@@ -108,13 +113,46 @@ def _to_best_lift(value: str) -> float:
     """
     return max(0.0, _to_float(value))
 
-def save_athletes_to_db(competition: Competition, athletes_data: list):
-    """Saves a list of athlete dictionaries to the database, linked to the given competition.
+def _remove_withdrawn_athletes(competition: Competition, scraped_names: set) -> int:
+    """Deletes athletes stored for a competition that are missing from the latest scrape.
+
+    Args:
+        competition (Competition): The competition whose roster was just scraped.
+        scraped_names (set): athlete names present in the latest scrape.
+
+    Returns:
+        int: number of athletes removed
+    """
+    # an empty scrape is far more likely a bad export than a meet with no lifters
+    if not scraped_names:
+        logger.warning("No athletes scraped for %s — skipping withdrawn-athlete removal", competition)
+        return 0
+
+    withdrawn = Athlete.objects.filter(competition=competition).exclude(athlete_name__in=scraped_names)
+    removed_names = list(withdrawn.values_list('athlete_name', flat=True))
+    if not removed_names:
+        return 0
+
+    withdrawn.delete()
+    for name in removed_names:
+        logger.info("  [removed withdrawn] %s — %s", competition, name)
+    return len(removed_names)
+
+@transaction.atomic
+def save_athletes_to_db(competition: Competition, athletes_data: list) -> int:
+    """Syncs a competition's athletes with the database from a list of athlete dictionaries.
+
+    Athletes in the list are created or updated; athletes already stored for the
+    competition but missing from the list (withdrawn) are removed.
 
     Args:
         competition (Competition): The competition instance to link athletes to.
         athletes_data (list): List of dictionaries containing athlete data.
+
+    Returns:
+        int: number of withdrawn athletes removed
     """
+    scraped_names = set()
     for athlete_dict in athletes_data:
         # Map CSV fields to model fields
         athlete_data = {
@@ -144,7 +182,42 @@ def save_athletes_to_db(competition: Competition, athletes_data: list):
             athlete_name=athlete_data['athlete_name'],
             defaults=athlete_data
         )
+        scraped_names.add(athlete_data['athlete_name'])
+
+    return _remove_withdrawn_athletes(competition, scraped_names)
 ################################### MAIN ATHLETE DATA FUNCTIONS ####################################
+
+def _export_athlete_csv(driver, link: str, download_dir: str, csv_timeout: int = 120) -> str:
+    """Navigates an existing webdriver to a competition page and downloads its CSV export.
+
+    Args:
+        driver (webdriver.Chrome): a running driver whose downloads go to download_dir
+        link (str): competition URL on liftingcast.com
+        download_dir (str): directory the driver downloads into
+        csv_timeout (int): seconds to wait for the download to finish
+
+    Returns:
+        str: path to the downloaded CSV file
+    """
+    # snapshot existing csv files before starting
+    before = set(glob.glob(os.path.join(download_dir, "*.csv")))
+
+    wait = WebDriverWait(driver, 20)
+    driver.get(link)
+
+    export_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.export-button")))
+    export_btn.click()
+
+    wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".export-results-modal")))
+    # clicking modal
+    modal_export = wait.until(
+        EC.element_to_be_clickable((
+            By.XPATH,
+            "//div[contains(@class,'export-results-modal')]//button[normalize-space()='Export' or contains(., 'Export')]"
+        )))
+    driver.execute_script("arguments[0].click();", modal_export)
+
+    return _wait_for_new_csv(download_dir, before, timeout=csv_timeout)
 
 def _get_athlete_csv(link: str, download_dir: str = None):
     """Uses a webdriver to navigate to a competition page and download its CSV export.
@@ -160,28 +233,53 @@ def _get_athlete_csv(link: str, download_dir: str = None):
     if download_dir is None:
         download_dir = os.path.abspath(os.path.join(os.getcwd(), "data"))
     driver = create_webdriver(download_dir)
-    # snapshot existing csv files before starting
-    before = set(glob.glob(os.path.join(download_dir, "*.csv")))
-
     try:
-        wait = WebDriverWait(driver, 20)
-        driver.get(link)
-
-        export_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button.export-button")))
-        export_btn.click()
-
-        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".export-results-modal")))
-        # clicking modal
-        modal_export = wait.until(
-            EC.element_to_be_clickable((
-                By.XPATH,
-                "//div[contains(@class,'export-results-modal')]//button[normalize-space()='Export' or contains(., 'Export')]"
-            )))
-        driver.execute_script("arguments[0].click();", modal_export)
-
-        return _wait_for_new_csv(download_dir, before, timeout=120)
+        return _export_athlete_csv(driver, link, download_dir)
     finally:
         driver.quit()
+
+def _open_fresh_tab(driver, download_dir: str):
+    """Replaces the driver's current tab with a new one that downloads into download_dir.
+
+    A tab that keeps loading liftingcast pages hangs on the "LOADING" screen on
+    every 7th page, so a reused driver loads each competition in its own tab.
+    """
+    old_tab = driver.current_window_handle
+    driver.switch_to.new_window("tab")
+    new_tab = driver.current_window_handle
+    driver.switch_to.window(old_tab)
+    driver.close()
+    driver.switch_to.window(new_tab)
+    # download behaviour is set per tab
+    driver.execute_cdp_cmd("Page.setDownloadBehavior",
+                           {"behavior": "allow",
+                            "downloadPath": download_dir})
+
+def scrape_athletes_with_driver(driver, competition: Competition, download_dir: str) -> tuple:
+    """Scrapes one competition's athletes with an already-running driver.
+
+    Used by the live refresh, which keeps drivers open between scrapes to avoid
+    paying Chrome's startup cost per competition. Safe to call from worker
+    threads — no database access. Raises on failure.
+
+    Args:
+        driver (webdriver.Chrome): a running driver whose downloads go to download_dir
+        competition (Competition): The competition to scrape athletes for.
+        download_dir (str): directory the driver downloads into
+
+    Returns:
+        (digest, athletes_data) where digest is a hash of the raw CSV, used to
+        tell whether anything changed since the previous scrape.
+    """
+    _open_fresh_tab(driver, download_dir)
+    csv_path = _export_athlete_csv(driver, competition.comp_url, download_dir,
+                                   csv_timeout=LIVE_CSV_TIMEOUT_SECONDS)
+    try:
+        with open(csv_path, 'rb') as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        return digest, _athlete_data_to_dicts(csv_path)
+    finally:
+        os.remove(csv_path)
 
 def _scrape_athletes_once(competition: Competition) -> list:
     """Single scrape attempt in its own temp download directory. Raises on failure."""

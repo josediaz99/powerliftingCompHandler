@@ -1,7 +1,10 @@
 """
-run_scheduler.py
-Starts the APScheduler background scheduler which fires the
-competition scraper every 6 hours to stay current across time zones.
+ironCrawler/management/commands/run_scheduler.py
+
+Starts the APScheduler background scheduler, which runs two jobs:
+  - the full competition + athlete scrape every 3 hours, to stay current
+    across time zones and pick up changes made before a competition
+  - the live refresh every minute, for competitions that have begun
 
 Usage:
     python manage.py run_scheduler
@@ -12,42 +15,50 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 from django_apscheduler.jobstores import DjangoJobStore
+from django_apscheduler.models import DjangoJob
 
-from ironCrawler.models import Competition
-from ironCrawler.webscraping.scrape_athlete_data import (
-    save_athletes_to_db,
-    scrape_athletes_only,
-)
+from ironCrawler.webscraping.live_refresh import live_refresher
 from ironCrawler.webscraping.scraper import scrape_and_load
 
 logger = logging.getLogger("ironCrawler.scheduler")
 
-def live_competition_job():
-    """Every-minute job: refresh athletes for all competitions happening today."""
-    today = timezone.localdate()
-    live = list(Competition.objects.filter(comp_date=today))
+FULL_SCRAPE_INTERVAL_HOURS = 3
+# job ids from earlier versions; jobs are stored in the DB, so a renamed job would keep running
+RETIRED_JOB_IDS = ["scrape_every_6h"]
 
-    if not live:
-        logger.debug("Live-competition job: no competitions today (%s)", today)
+def live_competition_job():
+    """Every-minute job: refresh athletes for all competitions happening right now."""
+    try:
+        summary = live_refresher.refresh()
+    except Exception:
+        logger.exception("Live-competition job failed")
         return
 
-    logger.info("Live-competition job: refreshing athletes for %d competition(s) on %s", len(live), today)
+    if not summary['live']:
+        logger.debug("Live-competition job: no live competitions")
+        return
 
-    for comp in live:
-        _, athletes_data, error = scrape_athletes_only(comp)
-        if error:
-            logger.error("Live refresh failed after retry for %s: %s", comp, error)
-        else:
-            save_athletes_to_db(comp, athletes_data)
-            logger.info("Live refresh complete for %s — %d athletes updated", comp, len(athletes_data))
+    logger.info(
+        "Live-competition job: %d live — updated: %d, unchanged: %d, failed: %d, not reached: %d (%.1fs)",
+        summary['live'], summary['updated'], summary['unchanged'],
+        summary['failed'], summary['not_reached'], summary['seconds'],
+    )
+    if summary['not_reached']:
+        logger.warning(
+            "Live-competition job ran out of time — %d competition(s) moved to the front of the next pass",
+            summary['not_reached'],
+        )
 
 
 def scrape_job():
-    """Scheduled job: scrape competitions and athletes, then load into the DB."""
+    """Scheduled job: scrape competitions and athletes, then load into the DB.
+
+    Competitions that have begun are left to the live refresh, which already
+    scrapes them every minute.
+    """
     try:
-        created, skipped, athletes, failed = scrape_and_load()
+        created, skipped, athletes, failed = scrape_and_load(skip_live=True)
         logger.info(
             "Scheduled scrape complete — created: %d, skipped: %d, athletes: %d, failed: %d",
             created, skipped, athletes, len(failed),
@@ -58,16 +69,18 @@ def scrape_job():
         logger.exception("Scheduled scrape failed")
 
 class Command(BaseCommand):
-    help = "Starts the background scheduler — scrapes competitions every 6 hours."
+    help = "Starts the background scheduler — full scrape every 3 hours, live refresh every minute."
 
     def handle(self, *args, **options):
         scheduler = BackgroundScheduler()
         scheduler.add_jobstore(DjangoJobStore(), "default")
 
+        DjangoJob.objects.filter(id__in=RETIRED_JOB_IDS).delete()
+
         scheduler.add_job(
             scrape_job,
-            trigger=IntervalTrigger(hours=6),
-            id="scrape_every_6h",
+            trigger=IntervalTrigger(hours=FULL_SCRAPE_INTERVAL_HOURS),
+            id="full_scrape",
             name="Scrape LiftingCast competitions",
             jobstore="default",
             replace_existing=True,
@@ -77,15 +90,19 @@ class Command(BaseCommand):
             live_competition_job,
             trigger=IntervalTrigger(minutes=1),
             id="live_competition_refresh",
-            name="Refresh athletes for today's competitions",
+            name="Refresh athletes for live competitions",
             jobstore="default",
             replace_existing=True,
+            # never overlap passes; if one overruns, run once afterwards rather than catching up
+            max_instances=1,
+            coalesce=True,
         )
 
         logger.info("Starting scheduler...")
         scheduler.start()
         self.stdout.write(self.style.SUCCESS(
-            "Scheduler running — full scrape every 6 h, live refresh every 1 min. Press Ctrl+C to stop."
+            f"Scheduler running — full scrape every {FULL_SCRAPE_INTERVAL_HOURS} h, "
+            "live refresh every 1 min. Press Ctrl+C to stop."
         ))
 
         try:
@@ -95,4 +112,5 @@ class Command(BaseCommand):
                 time.sleep(60)
         except (KeyboardInterrupt, SystemExit):
             scheduler.shutdown()
+            live_refresher.close()
             self.stdout.write(self.style.WARNING("Scheduler stopped."))

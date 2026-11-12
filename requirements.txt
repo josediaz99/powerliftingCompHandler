@@ -1,7 +1,7 @@
 selenium==4.38.0
 requests==2.32.5
 beautifulsoup4==4.14.3
-django>=4.2
+django>=6.1
 python-dotenv>=1.0
 apscheduler==3.10.4
 django-apscheduler==0.6.2

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Manage meets — IronCrawler</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Syne:wght@400;500;600;700;800&family=Syne+Mono&display=swap" rel="stylesheet">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'ironCrawler/style.css' %}">
+</head>
+<body>
+<div class="page manage-page">
+
+  <div class="topbar">
+    <a class="back" href="{% url 'index' %}">
+      <span class="chev">&lsaquo;</span><span>Meets</span>
+    </a>
+    <div class="comp-context">{{ user.get_username }}</div>
+    <form class="topbar-end" method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button class="link-btn" type="submit">Log out</button>
+    </form>
+  </div>
+
+  <div class="prompt-title">Scrape list</div>
+  <div class="prompt-sub">Only meets on the scrape list are scraped and shown to athletes</div>
+
+  <input class="search" id="search" type="search" placeholder="Search meets" aria-label="Search meets">
+
+  <!-- Scrape list on the left, meets that can be added on the right;
+       on a narrow screen they stack with the scrape list on top -->
+  <div class="manage-layout">
+
+    <div class="manage-col scheduled-col" role="region" aria-label="Scrape list">
+      <div class="list-header">
+        <span class="list-label on">Scheduled</span>
+        <span class="list-count"><span id="scheduledCount">{{ scheduled|length }}</span> scheduled</span>
+      </div>
+      <div class="comp-list" id="scheduledList">
+        {% for comp in scheduled %}{% include 'ironCrawler/_manage_card.html' %}{% endfor %}
+      </div>
+      <div class="empty{% if not scheduled %} show{% endif %}" id="scheduledEmpty"
+           data-empty="Nothing scheduled — add a meet to start scraping it">Nothing scheduled — add a meet to start scraping it</div>
+    </div>
+
+    <div class="manage-col available-col" role="region" aria-label="Available meets">
+      <div class="list-header">
+        <span class="list-label">Available</span>
+        <span class="list-count"><span id="availableCount">{{ available|length }}</span> available</span>
+      </div>
+      <div class="comp-list" id="availableList">
+        {% for comp in available %}{% include 'ironCrawler/_manage_card.html' %}{% endfor %}
+      </div>
+      <div class="empty{% if not available %} show{% endif %}" id="availableEmpty"
+           data-empty="No other meets to add">No other meets to add</div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Confirms each add / remove. Filled by the server after a plain form post, by the script otherwise. -->
+<div class="toast{% if messages %} show{% endif %}" id="toast" role="status" aria-live="polite">{% for message in messages %}{{ message }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>
+
+<script>
+(function () {
+  var lists = {
+    on:  { list: document.getElementById('scheduledList'), empty: document.getElementById('scheduledEmpty'),
+           count: document.getElementById('scheduledCount') },
+    off: { list: document.getElementById('availableList'), empty: document.getElementById('availableEmpty'),
+           count: document.getElementById('availableCount') }
+  };
+  var search = document.getElementById('search');
+  var toast = document.getElementById('toast');
+  var toastTimer;
+
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 3500);
+  }
+  if (toast.classList.contains('show')) showToast(toast.textContent);
+
+  function cardsIn(list) {
+    return Array.prototype.slice.call(list.querySelectorAll('.manage-card'));
+  }
+
+  // earliest date first, then by name — the same order the server renders
+  function sortKey(card) { return card.dataset.date + ' ' + card.dataset.name; }
+
+  function insertSorted(list, card) {
+    var key = sortKey(card);
+    var after = cardsIn(list).filter(function (other) { return sortKey(other) > key; })[0];
+    list.insertBefore(card, after || null);
+  }
+
+  // applies the search, then updates each list's count and empty message
+  function refresh() {
+    var term = search.value.trim().toLowerCase();
+    Object.keys(lists).forEach(function (key) {
+      var group = lists[key];
+      var cards = cardsIn(group.list);
+      var shown = 0;
+      cards.forEach(function (card) {
+        var match = card.dataset.name.indexOf(term) !== -1;
+        card.classList.toggle('hidden', !match);
+        if (match) shown++;
+      });
+      group.count.textContent = cards.length;
+      group.empty.textContent = cards.length ? 'No meets match this search' : group.empty.dataset.empty;
+      group.empty.classList.toggle('show', shown === 0);
+    });
+  }
+
+  // moves a card to the list matching its saved state and relabels its button
+  function place(card, on) {
+    var btn = card.querySelector('.list-action');
+    var title = card.dataset.title;
+    btn.value = on ? '0' : '1';
+    btn.textContent = on ? '\u2212' : '+';
+    btn.className = 'list-action ' + (on ? 'remove' : 'add');
+    btn.setAttribute('aria-label', on ? 'Remove ' + title + ' from the scrape list'
+                                      : 'Add ' + title + ' to the scrape list');
+    insertSorted(lists[on ? 'on' : 'off'].list, card);
+    refresh();
+
+    card.classList.remove('just-moved');
+    void card.offsetWidth;   // restart the highlight if the card is moved twice quickly
+    card.classList.add('just-moved');
+    if (card.classList.contains('hidden')) return;
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  document.querySelectorAll('.manage-card').forEach(function (card) {
+    card.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = card.querySelector('.list-action');
+      if (btn.disabled) return;
+      btn.disabled = true;
+
+      fetch(card.action, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': card.querySelector('[name=csrfmiddlewaretoken]').value,
+          'X-Requested-With': 'fetch'
+        },
+        body: new URLSearchParams({ enabled: btn.value })   // '1' to add, '0' to remove
+      }).then(function (response) {
+        // a redirect means the session ended and we were sent to the login page
+        if (!response.ok || response.redirected) throw new Error('not saved');
+        return response.json();
+      }).then(function (data) {
+        btn.disabled = false;
+        place(card, data.scrape_enabled);
+        showToast(data.message);
+      }).catch(function () {
+        // reload so the lists show what is really saved (or the login page appears)
+        window.location.reload();
+      });
+    });
+  });
+
+  search.addEventListener('input', refresh);
+})();
+</script>
+</body>
+</html>

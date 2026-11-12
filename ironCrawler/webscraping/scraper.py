@@ -1,5 +1,5 @@
 """
-ironCrawler/scraper.py
+ironCrawler/webscraping/scraper.py
 
 Provides scrape_and_load() — the single entry point used by the scheduler
 and management commands to sync liftingcast.com competitions with the DB.
@@ -7,13 +7,16 @@ and management commands to sync liftingcast.com competitions with the DB.
 Behaviour:
   - Creates competitions that don't exist yet
   - Removes competitions that have disappeared from the site
-  - Returns (created_count, skipped_count) so callers can log the result
+  - Scrapes and saves the athletes of every competition an admin has selected
+  - Returns (created_count, skipped_count, athletes_count, failed_competitions)
+    so callers can log the result
 """
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ironCrawler.models import Competition
+from ironCrawler.webscraping.live_refresh import live_competition_dates
 from ironCrawler.webscraping.scrape_athlete_data import (
     save_athletes_to_db,
     scrape_athletes_only,
@@ -26,16 +29,22 @@ MAX_SCRAPE_WORKERS = 4
 logger = logging.getLogger(__name__)
 
 
-def scrape_and_load() -> tuple[int, int, int, list[str]]:
+def scrape_and_load(skip_live: bool = False) -> tuple[int, int, int, list[str]]:
     """
     Scrapes liftingcast.com for upcoming competitions and syncs them with
-    the Competition table. Then scrapes athletes for all competitions.
+    the Competition table. Then scrapes athletes for the competitions an admin
+    has selected (Competition.scrape_enabled).
 
-    - New competitions are created.
+    - New competitions are created, not selected for scraping.
     - Competitions no longer returned by the scraper are deleted.
-    - Athletes are scraped and saved for all competitions.
+    - Athletes are scraped and saved for the selected competitions.
     - Competitions whose athlete scrape fails are collected and returned
       so callers can log/alert without blocking the rest of the run.
+
+    Args:
+        skip_live (bool): leave out the athlete scrape for competitions that have
+            begun (see live_competition_dates). The scheduler sets this because
+            its live refresh already scrapes those competitions every minute.
 
     Returns:
         (created_count, skipped_count, athletes_count, failed_competitions)
@@ -88,7 +97,14 @@ def scrape_and_load() -> tuple[int, int, int, list[str]]:
     # ── Step 3: scrape athletes (parallel scrape, serial DB write) ────────
     # Workers only do network/browser work — no DB access — to avoid SQLite
     # "database is locked" errors from concurrent writes.
-    competitions = list(Competition.objects.all())
+    competitions = Competition.objects.filter(scrape_enabled=True)
+    logger.info("Step 3/3 — %d of %d competitions are selected for scraping",
+                competitions.count(), Competition.objects.count())
+    if skip_live:
+        live = competitions.filter(comp_date__in=live_competition_dates())
+        logger.info("Step 3/3 — leaving %d live competition(s) to the live refresh", live.count())
+        competitions = competitions.exclude(pk__in=live)
+    competitions = list(competitions)
     n_workers = min(MAX_SCRAPE_WORKERS, len(competitions)) if competitions else 1
     logger.info("Step 3/3 — Scraping athletes for %d competitions (%d parallel workers)...", len(competitions), n_workers)
 

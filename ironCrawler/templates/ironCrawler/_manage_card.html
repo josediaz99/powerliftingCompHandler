@@ -1,0 +1,22 @@
+{# One meet on the manage page. The button posts the state it would move to, so it works without JS. #}
+<form class="card comp-card manage-card" method="post"
+      action="{% url 'toggle_competition_scrape' comp.comp_id %}"
+      data-name="{{ comp.comp_name|lower }}" data-title="{{ comp.comp_name }}"
+      data-date="{{ comp.comp_date|date:'Y-m-d' }}">
+  {% csrf_token %}
+  <div class="card-date">
+    <div class="date-num">{{ comp.comp_date|date:"d" }}</div>
+    <div class="date-mon">{{ comp.comp_date|date:"M" }}</div>
+  </div>
+  <div class="manage-main">
+    <div class="card-name">{{ comp.comp_name }}</div>
+    <div class="manage-sub">{{ comp.athlete_count }} athlete{{ comp.athlete_count|pluralize }} stored</div>
+  </div>
+  {% if comp.scrape_enabled %}
+  <button class="list-action remove" type="submit" name="enabled" value="0"
+          aria-label="Remove {{ comp.comp_name }} from the scrape list">&minus;</button>
+  {% else %}
+  <button class="list-action add" type="submit" name="enabled" value="1"
+          aria-label="Add {{ comp.comp_name }} to the scrape list">+</button>
+  {% endif %}
+</form>

@@ -1,8 +1,8 @@
 """
-ironCrawler/scrape_competition_data.py
+ironCrawler/webscraping/scrape_competition_data.py
 
 scrapes upcoming competition data from lifting cast main page
-Run via: python manage.py scrape_competition_data --url <meet url>
+Run via: python manage.py scrape_competitions
 """
 # standard libraries
 import logging

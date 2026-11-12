@@ -6,6 +6,8 @@ class Competition(models.Model):
     comp_name = models.CharField(max_length=255)
     comp_url  = models.URLField()
     comp_date = models.DateField()
+    # athletes are only scraped for competitions an admin has switched on
+    scrape_enabled = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('comp_name', 'comp_date')

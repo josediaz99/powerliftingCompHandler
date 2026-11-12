@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="{% static 'ironCrawler/style.css' %}" />
   </head>
   <body>
-    <div class="page">
+    <div class="page dash-page">
       <div class="topbar">
         <a
           class="back"
@@ -26,6 +26,7 @@
 
       <div class="dash-layout">
         <div class="dash-left">
+          <div class="ath-comp">{{ athlete.competition.comp_name }}</div>
           <div class="ath-name">{{ athlete.athlete_name }}</div>
           <div class="tag-row">
             <span class="tag">{{ athlete.gender }}</span>
@@ -40,28 +41,20 @@
             >{% endif %}
           </div>
 
-          <!-- Refresh latest data -->
-          <div class="refresh-wrap">
-            <button class="refresh-btn" id="refreshBtn">
-              <span class="spinner"></span>
-              <span id="refreshLabel">Pull latest data</span>
-            </button>
-            <div class="refresh-meta" id="refreshMeta">
-              Tap to fetch the latest results
-            </div>
-          </div>
+          <!-- Data refreshes itself; this line says when it last did -->
+          <div class="refresh-meta" id="refreshMeta">Updates automatically</div>
 
           <!-- Summary cards -->
           <div class="summary">
             <div class="sum-card">
               <div class="sum-label">Total</div>
-              <div class="sum-value">{{ athlete.total }} kg</div>
+              <div class="sum-value" id="totalValue">{{ athlete.total }} kg</div>
               <div class="sum-rank" id="totalRank">&mdash;</div>
               <div class="sum-gap" id="totalGap">&mdash;</div>
             </div>
             <div class="sum-card">
               <div class="sum-label">DOTS</div>
-              <div class="sum-value">
+              <div class="sum-value" id="dotsValue">
                 {{ athlete.dots_score|floatformat:1|default:"N/A" }}
               </div>
               <div class="sum-rank" id="dotsRank">&mdash;</div>
@@ -80,10 +73,15 @@
             </div>
             <div class="ctrl-row">
               <span class="ctrl-label">Compare</span>
-              <div class="seg" id="scopeSeg">
-                <button data-v="all" class="active">All</button>
-                <button data-v="weight">Wheight Class</button>
-                <button data-v="category">Category</button>
+              <div class="checks" id="scopeChecks">
+                <label class="check">
+                  <input type="checkbox" data-v="weight" />
+                  <span>Weight class</span>
+                </label>
+                <label class="check">
+                  <input type="checkbox" data-v="category" />
+                  <span>Category</span>
+                </label>
               </div>
             </div>
           </div>
@@ -98,65 +96,55 @@
         </div>
       </div>
 
-      <!-- Hidden competitor pool — JS reads data-* attrs to build the leaderboard -->
-      <div id="poolData" hidden>
-        {% for c in competitors %}
-        <i
-          data-id="{{ c.id }}"
-          data-self="{% if c.id == athlete.id %}1{% else %}0{% endif %}"
-          data-name="{{ c.athlete_name }}"
-          data-gender="{{ c.gender }}"
-          data-weight="{{ c.weight_class }}"
-          data-division="{{ c.division }}"
-          data-category="{{ c.category }}"
-          data-total="{{ c.total }}"
-          data-dots="{{ c.dots_score|default:0 }}"
-          data-squat="{{ c.best_squat|default:'' }}"
-          data-bench="{{ c.best_bench|default:'' }}"
-          data-deadlift="{{ c.best_deadlift|default:'' }}"
-        ></i>
-        {% endfor %}
-      </div>
     </div>
+
+    <!-- Competitor pool — the JS below ranks it and re-fetches it to stay current -->
+    {{ pool|json_script:"poolData" }}
 
     <script>
       (function () {
-        var nodes = Array.prototype.slice.call(
-          document.querySelectorAll("#poolData i"),
-        );
-        var pool = nodes.map(function (n) {
-          return {
-            id: n.dataset.id,
-            self: n.dataset.self === "1",
-            name: n.dataset.name,
-            gender: n.dataset.gender,
-            weight: n.dataset.weight,
-            division: n.dataset.division,
-            category: n.dataset.category,
-            total: parseFloat(n.dataset.total) || 0,
-            dots: parseFloat(n.dataset.dots) || 0,
-            squat: n.dataset.squat === "" ? null : parseFloat(n.dataset.squat),
-            bench: n.dataset.bench === "" ? null : parseFloat(n.dataset.bench),
-            deadlift:
-              n.dataset.deadlift === "" ? null : parseFloat(n.dataset.deadlift),
-          };
-        });
+        var SELF_ID = {{ athlete.id }};
+        var DATA_URL = "{% url 'athlete_dash_data' athlete.id %}";
+        var REFRESH_MS = 30000;
 
-        var you = pool.filter(function (a) {
-          return a.self;
-        })[0];
-        if (!you) return;
+        var pool = JSON.parse(document.getElementById("poolData").textContent);
+        var you = null;
 
         var metric = "dots"; // 'dots' | 'total'
-        var scope = "all"; // 'all' | 'weight' | 'category'
+        var scope = { weight: false, category: false }; // compare checkboxes
         var expanded = null;
+        var onRoster = true;
+
+        function findSelf() {
+          you = pool.filter(function (a) {
+            return a.id === SELF_ID;
+          })[0];
+        }
+
+        // names, divisions and weight classes come from liftingcast, so never trust them as HTML
+        function esc(v) {
+          return String(v).replace(/[&<>"']/g, function (ch) {
+            return {
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            }[ch];
+          });
+        }
 
         function valOf(a, m) {
           return m === "dots" ? a.dots : a.total;
         }
 
+        // lifts are loaded in 2.5 kg steps, so keep the half kilo instead of rounding it away
+        function kg(v) {
+          return String(Math.round(v * 10) / 10);
+        }
+
         function fmt(v, m) {
-          return m === "dots" ? v.toFixed(1) : Math.round(v) + " kg";
+          return m === "dots" ? v.toFixed(1) : kg(v) + " kg";
         }
 
         function fmtGap(v, m) {
@@ -166,19 +154,24 @@
             s +
             (m === "dots"
               ? Math.abs(v).toFixed(1)
-              : Math.round(Math.abs(v)) + " kg")
+              : kg(Math.abs(v)) + " kg")
           );
         }
 
-        function rankPool(m, sc) {
+        // Totals only mean something inside a weight class, so ranking by total always applies it
+        function byWeight(m) {
+          return m === "total" || scope.weight;
+        }
+
+        function rankPool(m) {
           var p = pool.filter(function (a) {
             return a.gender === you.gender;
           });
-          if (sc === "weight")
+          if (byWeight(m))
             p = p.filter(function (a) {
               return a.weight === you.weight;
             });
-          if (sc === "category")
+          if (scope.category)
             p = p.filter(function (a) {
               return a.category === you.category;
             });
@@ -189,7 +182,7 @@
         }
 
         function summaryFor(m, elRank, elGap) {
-          var p = rankPool(m, scope);
+          var p = rankPool(m);
           var idx = p
             .map(function (a) {
               return a.id;
@@ -207,19 +200,19 @@
         }
 
         function buildDetail(them) {
-          var lifts = [];
-          if (them.squat != null && you.squat != null)
-            lifts.push(["Squat", them.squat, you.squat, "kg"]);
-          if (them.bench != null && you.bench != null)
-            lifts.push(["Bench", them.bench, you.bench, "kg"]);
-          if (them.deadlift != null && you.deadlift != null)
-            lifts.push(["Deadlift", them.deadlift, you.deadlift, "kg"]);
-          lifts.push(["Total", them.total, you.total, "kg"]);
-          lifts.push(["DOTS", them.dots, you.dots, "dots"]);
+          var lifts = [
+            ["Squat", them.squat, you.squat, "kg"],
+            ["Bench", them.bench, you.bench, "kg"],
+            // squat + bench: what each lifter carries into the deadlift
+            ["Subtotal", them.squat + them.bench, you.squat + you.bench, "kg"],
+            ["Deadlift", them.deadlift, you.deadlift, "kg"],
+            ["Total", them.total, you.total, "kg"],
+            ["DOTS", them.dots, you.dots, "dots"],
+          ];
 
           var head =
             '<div class="det-head"><span>Lift</span><span>' +
-            them.name.split(" ")[0] +
+            esc(them.name.split(" ")[0]) +
             "</span><span>You</span><span>Δ</span></div>";
 
           var rows = lifts
@@ -229,16 +222,18 @@
                 unit = L[3];
               var dv = y - t;
               var f = function (n) {
-                return unit === "dots" ? n.toFixed(1) : String(Math.round(n));
+                return unit === "dots" ? n.toFixed(1) : kg(n);
               };
               var cls = dv > 0 ? "ahead" : dv < 0 ? "behind" : "even";
               var ds =
                 (dv > 0 ? "+" : dv < 0 ? "−" : "") +
                 (unit === "dots"
                   ? Math.abs(dv).toFixed(1)
-                  : String(Math.round(Math.abs(dv))));
+                  : kg(Math.abs(dv)));
               return (
-                '<div class="det-row">' +
+                '<div class="det-row' +
+                (L[0] === "Subtotal" ? " det-sub" : "") +
+                '">' +
                 '<span class="det-lift">' +
                 L[0] +
                 "</span>" +
@@ -262,7 +257,7 @@
         }
 
         function render() {
-          // Segmented control active states
+          // Control states
           Array.prototype.forEach.call(
             document.querySelectorAll("#metricSeg button"),
             function (b) {
@@ -270,13 +265,20 @@
             },
           );
           Array.prototype.forEach.call(
-            document.querySelectorAll("#scopeSeg button"),
-            function (b) {
-              b.classList.toggle("active", b.dataset.v === scope);
+            document.querySelectorAll("#scopeChecks input"),
+            function (box) {
+              var forced = box.dataset.v === "weight" && metric === "total";
+              box.checked = forced || scope[box.dataset.v];
+              box.disabled = forced;
             },
           );
 
           // Summary cards
+          document.getElementById("totalValue").textContent =
+            you.total + " kg";
+          document.getElementById("dotsValue").textContent = you.dots
+            ? you.dots.toFixed(1)
+            : "N/A";
           summaryFor(
             "total",
             document.getElementById("totalRank"),
@@ -289,7 +291,7 @@
           );
 
           // Leaderboard
-          var p = rankPool(metric, scope);
+          var p = rankPool(metric);
           var selfIdx = p
             .map(function (a) {
               return a.id;
@@ -334,12 +336,12 @@
                 "</span>" +
                 '<div class="lb-main">' +
                 '<div class="lb-name">' +
-                a.name +
+                esc(a.name) +
                 "</div>" +
                 '<div class="lb-sub">' +
-                a.weight +
+                esc(a.weight) +
                 " · " +
-                a.division +
+                esc(a.division) +
                 "</div>" +
                 "</div>" +
                 '<span class="lb-value">' +
@@ -363,7 +365,7 @@
             ),
             function (row) {
               row.addEventListener("click", function () {
-                var id = row.parentNode.dataset.id;
+                var id = Number(row.parentNode.dataset.id);
                 expanded = expanded === id ? null : id;
                 render();
               });
@@ -381,30 +383,57 @@
             }
           });
         document
-          .getElementById("scopeSeg")
-          .addEventListener("click", function (e) {
+          .getElementById("scopeChecks")
+          .addEventListener("change", function (e) {
             if (e.target.dataset.v) {
-              scope = e.target.dataset.v;
+              scope[e.target.dataset.v] = e.target.checked;
               expanded = null;
               render();
             }
           });
 
-        // Refresh button — reloads the page so Django re-queries the DB
-        document
-          .getElementById("refreshBtn")
-          .addEventListener("click", function () {
-            var btn = this;
-            if (btn.disabled) return;
-            btn.disabled = true;
-            btn.classList.add("loading");
-            document.getElementById("refreshLabel").textContent = "Updating…";
-            document.getElementById("refreshMeta").textContent =
-              "Fetching latest results…";
-            window.location.reload();
-          });
+        // Keeps the dashboard current: the server refreshes live meets every minute,
+        // so the pool is re-fetched on a timer instead of a manual button
+        function setStatus(text) {
+          document.getElementById("refreshMeta").textContent = text;
+        }
 
+        function refresh() {
+          if (document.hidden || !onRoster) return;
+          fetch(DATA_URL)
+            .then(function (res) {
+              if (res.status === 404) {
+                onRoster = false;
+                setStatus("No longer on this meet's roster");
+                return null;
+              }
+              if (!res.ok) throw new Error(res.status);
+              return res.json();
+            })
+            .then(function (data) {
+              if (!data) return;
+              pool = data.pool;
+              findSelf();
+              render();
+              setStatus(
+                "Updated " +
+                  new Date().toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  }),
+              );
+            })
+            .catch(function () {
+              setStatus("Couldn't update — retrying");
+            });
+        }
+
+        findSelf();
+        if (!you) return;
         render();
+        setInterval(refresh, REFRESH_MS);
+        // catch up straight away when the tab is looked at again
+        document.addEventListener("visibilitychange", refresh);
       })();
     </script>
   </body>

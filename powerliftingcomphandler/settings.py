@@ -26,7 +26,7 @@ SECRET_KEY = "django-insecure-#fqhd9@%y0fe^dlpc1*wi77js4rho*)pz%9&325g7%0d-zb#2h
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -57,7 +57,7 @@ ROOT_URLCONF = "powerliftingcomphandler.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / 'templates'],
+        "DIRS": [],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -101,6 +101,11 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
+
+# Admin login (ironCrawler/urls.py) — staff accounts choose which competitions are scraped
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'manage_competitions'
+LOGOUT_REDIRECT_URL = 'index'
 
 
 # Internationalization

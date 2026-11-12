@@ -14,9 +14,16 @@
 
 <div class="page">
 
-  <header>
-    <h1 class="wordmark">Iron<span>Crawler</span></h1>
-    <p class="tagline">Upcoming &amp; Active Meets</p>
+  <header class="site-header">
+    <div>
+      <h1 class="wordmark">Iron<span>Crawler</span></h1>
+      <p class="tagline">Upcoming &amp; Active Meets</p>
+    </div>
+    {% if user.is_staff %}
+    <a class="link-btn" href="{% url 'manage_competitions' %}">Manage</a>
+    {% else %}
+    <a class="link-btn" href="{% url 'login' %}">Admin</a>
+    {% endif %}
   </header>
 
   <div class="divider"></div>
